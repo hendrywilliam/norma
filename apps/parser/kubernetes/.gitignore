@@ -1,0 +1,13 @@
+# Ignore secrets (don't commit real passwords)
+secret.yaml
+*.secret.yaml
+
+# Ignore backup files
+*.sql
+*.sql.gz
+backup-*.sql
+
+# Ignore local development configs
+*-local.yaml
+*-dev.yaml
+*-staging.yaml

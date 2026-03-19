@@ -3,7 +3,7 @@ Parser module untuk peraturan.go.id
 """
 
 from .scraper import scrape_peraturan, download_pdf
-from .pdf_parser import parse_pdf, parse_pdf_from_bytes, validate_pdf, extract_structure, extract_keywords
+from .pdf_parser import parse_pdf, parse_pdf_from_url, validate_pdf, extract_peraturan_structure, extract_keywords
 from .status import (
     get_parse_status,
     update_parse_status,
@@ -22,9 +22,9 @@ __all__ = [
     "scrape_peraturan",
     "download_pdf",
     "parse_pdf",
-    "parse_pdf_from_bytes",
+    "parse_pdf_from_url",
     "validate_pdf",
-    "extract_structure",
+    "extract_peraturan_structure",
     "extract_keywords",
     "get_parse_status",
     "update_parse_status",

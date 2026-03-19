@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parser-api
+  namespace: norma-parser
+  labels:
+    app: parser-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parser-api
+  template:
+    metadata:
+      labels:
+        app: parser-api
+    spec:
+      containers:
+      - name: parser-api
+        image: norma-parser:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        # Database Configuration from ConfigMap
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_NAME
+        - name: DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_USER
+        - name: DB_MIN_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_MIN_CONNECTIONS
+        - name: DB_MAX_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: DB_MAX_CONNECTIONS
+
+        # Database Password from Secret
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: parser-secrets
+              key: DB_PASSWORD
+
+        # Application Configuration
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: HOST
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: PORT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: LOG_LEVEL
+        - name: RELOAD
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: RELOAD
+
+        # Scraping Configuration
+        - name: REQUEST_DELAY
+          valueFrom:
+            configMapKeyRef:
+              name: parser-config
+              key: REQUEST_DELAY
+
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      restartPolicy: Always

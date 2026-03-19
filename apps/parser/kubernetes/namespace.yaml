@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: norma-parser
+  labels:
+    app: norma-parser
+    environment: production

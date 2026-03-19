@@ -1,0 +1,77 @@
+# Values file untuk Kubernetes deployment (Helm-style)
+# Ganti nilai-nilai sesuai environment
+
+# Namespace
+namespace: norma-parser
+
+# Database Configuration
+database:
+  image: postgres:15-alpine
+  storage: 10Gi
+  storageClass: standard
+  name: peraturan_db
+  user: postgres
+  # Password diambil dari secret
+  minConnections: 1
+  maxConnections: 10
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+
+# Parser API Configuration
+parser:
+  image: norma-parser:latest
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  port: 8000
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+  env:
+    logLevel: info
+    reload: false
+    host: 0.0.0.0.0
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# HPA Configuration
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilization: 70
+  targetMemoryUtilization: 80
+  scaleDownStabilizationSeconds: 300
+  scaleUpStabilizationSeconds: 60
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: parser.norma.local
+  tls:
+    enabled: false
+    # secretName: parser-tls-secret
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+# Scraping Configuration
+scraping:
+  requestDelay: 1

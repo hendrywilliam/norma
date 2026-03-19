@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: parser-api-ingress
+  namespace: norma-parser
+  labels:
+    app: parser-api
+  annotations:
+    # Ingress Controller Annotations (sesuaikan dengan ingress controller yang digunakan)
+    # Untuk NGINX Ingress Controller:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # CORS Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Access-Control-Allow-Origin: *" always;
+      more_set_headers "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS" always;
+      more_set_headers "Access-Control-Allow-Headers: Origin, Content-Type, Authorization" always;
+spec:
+  ingressClassName: nginx  # Sesuaikan dengan ingress class yang tersedia
+  rules:
+  - host: parser.norma.local  # Ganti dengan domain yang sesuai
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: parser-api-service
+            port:
+              number: 8000
+  # TLS Configuration (optional)
+  # tls:
+  # - hosts:
+  #   - parser.norma.local
+  #   secretName: parser-tls-secret

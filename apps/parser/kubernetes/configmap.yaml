@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parser-config
+  namespace: norma-parser
+data:
+  # Database Configuration
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "peraturan_db"
+  DB_USER: "postgres"
+  DB_MIN_CONNECTIONS: "1"
+  DB_MAX_CONNECTIONS: "10"
+
+  # Application Configuration
+  HOST: "0.0.0.0.0"
+  PORT: "8000"
+  LOG_LEVEL: "info"
+  RELOAD: "false"
+
+  # Scraping Configuration
+  REQUEST_DELAY: "1"
