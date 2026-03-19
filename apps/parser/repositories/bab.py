@@ -9,10 +9,10 @@ from datetime import datetime
 import logging
 
 # Import db connection management
-from ..db.db import get_db_connection
+from db import get_db_connection, execute_query, validate_identifier
 
 # Import Bab model
-from ..models.bab import (
+from models.bab import (
     BabBase, BabCreate, BabUpdate, BabInDB, BabResponse,
     BabWithPasalCount, BabWithPeraturanInfo, BabListResponse
 )
@@ -37,8 +37,6 @@ class BabRepository:
         Returns:
             ID bab yang dibuat
         """
-        from ...models.bab import BabCreate
-
         insert_query = """
         INSERT INTO bab (
             peraturan_id, nomor_bab, judul_bab, urutan
@@ -52,16 +50,18 @@ class BabRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                bab_id = await conn.fetchval(
-                    insert_query,
+            bab_id = await execute_query(
+                insert_query,
+                args=(
                     bab_data.get('peraturan_id'),
                     bab_data.get('nomor_bab'),
                     bab_data.get('judul_bab'),
                     bab_data.get('urutan')
-                )
-                logger.info(f"Bab created/updated: {bab_id}")
-                return bab_id
+                ),
+                fetch="val"
+            )
+            logger.info(f"Bab created/updated: {bab_id}")
+            return bab_id
         except Exception as e:
             logger.error(f"Failed to create bab: {e}")
             raise
@@ -84,13 +84,7 @@ class BabRepository:
         WHERE id = $1
         """
 
-        try:
-            async with get_db_connection() as conn:
-                result = await conn.fetchrow(select_query, bab_id)
-                return dict(result) if result else None
-        except Exception as e:
-            logger.error(f"Failed to get bab {bab_id}: {e}")
-            return None
+        return await execute_query(select_query, args=(bab_id,), fetch="one")
 
     async def get_list(
         self,
@@ -157,13 +151,14 @@ class BabRepository:
         Returns:
             True jika berhasil, False jika tidak
         """
-        # Build SET clause
+        # Build SET clause dengan prepared statement
+        allowed_fields = ['nomor_bab', 'judul_bab', 'urutan']
         set_clauses = []
         params = []
         param_count = 0
 
         for key, value in update_data.items():
-            if key != 'id':  # Skip id
+            if key in allowed_fields:
                 param_count += 1
                 set_clauses.append(f"{key} = ${param_count}")
                 params.append(value)
@@ -181,11 +176,9 @@ class BabRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(update_query, *params)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Updated bab {bab_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(update_query, args=(*params, bab_id), fetch="exec")
+            logger.info(f"Updated bab {bab_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to update bab {bab_id}: {e}")
             return False
@@ -203,14 +196,32 @@ class BabRepository:
         delete_query = "DELETE FROM bab WHERE id = $1"
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(delete_query, bab_id)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Deleted bab {bab_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(delete_query, args=(bab_id,), fetch="exec")
+            logger.info(f"Deleted bab {bab_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to delete bab {bab_id}: {e}")
             return False
+
+    async def delete_by_peraturan(self, peraturan_id: str) -> int:
+        """
+        Delete semua bab milik peraturan spesifik
+
+        Args:
+            peraturan_id: ID peraturan
+
+        Returns:
+            Jumlah bab yang dihapus
+        """
+        delete_query = "DELETE FROM bab WHERE peraturan_id = $1"
+
+        try:
+            affected_rows = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            logger.info(f"Deleted {affected_rows} bab for peraturan {peraturan_id}")
+            return affected_rows
+        except Exception as e:
+            logger.error(f"Failed to delete bab for peraturan {peraturan_id}: {e}")
+            return 0
 
 
 # Singleton repository instance

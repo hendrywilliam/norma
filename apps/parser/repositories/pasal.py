@@ -1,4 +1,3 @@
-
 """
 Repository untuk Tabel Pasal
 CRUD operations untuk tabel pasal
@@ -10,7 +9,7 @@ from datetime import datetime
 import logging
 
 # Import db connection management
-from db import get_db_connection
+from db import get_db_connection, execute_query, validate_identifier, sanitize_search_query
 
 # Import Pasal models
 from models.pasal import (
@@ -56,9 +55,9 @@ class PasalRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                pasal_id = await conn.fetchval(
-                    insert_query,
+            pasal_id = await execute_query(
+                insert_query,
+                args=(
                     pasal_data.get('peraturan_id'),
                     pasal_data.get('bab_id'),
                     pasal_data.get('nomor_pasal'),
@@ -66,9 +65,11 @@ class PasalRepository:
                     pasal_data.get('konten_pasal'),
                     pasal_data.get('urutan'),
                     pasal_data.get('metadata', {})
-                )
-                logger.info(f"Pasal created/updated: {pasal_id}")
-                return pasal_id
+                ),
+                fetch="val"
+            )
+            logger.info(f"Pasal created/updated: {pasal_id}")
+            return pasal_id
         except Exception as e:
             logger.error(f"Failed to create pasal: {e}")
             raise
@@ -91,13 +92,7 @@ class PasalRepository:
         WHERE id = $1
         """
 
-        try:
-            async with get_db_connection() as conn:
-                result = await conn.fetchrow(select_query, pasal_id)
-                return dict(result) if result else None
-        except Exception as e:
-            logger.error(f"Failed to get pasal {pasal_id}: {e}")
-            return None
+        return await execute_query(select_query, args=(pasal_id,), fetch="one")
 
     async def get_list(
         self,
@@ -118,14 +113,12 @@ class PasalRepository:
         Returns:
             Dictionary dengan total, skip, limit, dan items
         """
-        # Build query
+        # Build query dengan prepared statements
         conditions = ["peraturan_id = $1"]
         params = [peraturan_id]
-        param_count = 1
 
-        if bab_id:
-            param_count += 1
-            conditions.append(f"bab_id = ${param_count}")
+        if bab_id is not None:
+            conditions.append("bab_id = $2")
             params.append(bab_id)
 
         where_clause = f"WHERE {' AND '.join(conditions)}"
@@ -134,16 +127,15 @@ class PasalRepository:
         count_query = f"SELECT COUNT(*) FROM pasals {where_clause}"
 
         # Get data
-        data_query = """
+        data_query = f"""
         SELECT id, peraturan_id, bab_id, nomor_pasal, judul_pasal,
                konten_pasal, urutan, metadata, created_at, updated_at,
                (SELECT COUNT(*) FROM ayats WHERE pasal_id = pasals.id) as total_ayat
         FROM pasals
         {where_clause}
         ORDER BY urutan ASC
-        LIMIT ${param_count + 1} OFFSET ${param_count + 2}
+        LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
         """
-        params.extend([limit, skip])
 
         try:
             async with get_db_connection() as conn:
@@ -179,13 +171,15 @@ class PasalRepository:
         Returns:
             True jika berhasil, False jika tidak
         """
-        # Build SET clause
+        # Build SET clause dengan prepared statements
+        allowed_fields = ['bab_id', 'nomor_pasal', 'judul_pasal',
+                         'konten_pasal', 'urutan', 'metadata']
         set_clauses = []
         params = []
         param_count = 0
 
         for key, value in update_data.items():
-            if key != 'id':  # Skip id
+            if key in allowed_fields:
                 param_count += 1
                 set_clauses.append(f"{key} = ${param_count}")
                 params.append(value)
@@ -203,11 +197,9 @@ class PasalRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(update_query, *params)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Updated pasal {pasal_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(update_query, args=(*params, pasal_id), fetch="exec")
+            logger.info(f"Updated pasal {pasal_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to update pasal {pasal_id}: {e}")
             return False
@@ -225,11 +217,9 @@ class PasalRepository:
         delete_query = "DELETE FROM pasals WHERE id = $1"
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(delete_query, pasal_id)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Deleted pasal {pasal_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(delete_query, args=(pasal_id,), fetch="exec")
+            logger.info(f"Deleted pasal {pasal_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to delete pasal {pasal_id}: {e}")
             return False
@@ -245,7 +235,7 @@ class PasalRepository:
         Search pasal dalam peraturan spesifik menggunakan full-text search
 
         Args:
-            query: Search query
+            query: Search query (sudah disanitasi)
             peraturan_id: ID peraturan
             skip: Offset untuk pagination
             limit: Limit hasil per page
@@ -253,14 +243,23 @@ class PasalRepository:
         Returns:
             Dictionary dengan total, skip, limit, dan items
         """
+        # Sanitize query untuk tsquery
+        tsquery = sanitize_search_query(query)
+
         search_query = """
         SELECT id, peraturan_id, bab_id, nomor_pasal, judul_pasal,
                konten_pasal, urutan, metadata, created_at, updated_at,
-               ts_rank(to_tsvector('indonesian', nomor_pasal || ' ' || COALESCE(judul_pasal, '') || ' ' || konten_pasal),
+               ts_rank(to_tsvector('indonesian',
+                       coalesce(nomor_pasal, '') || ' ' ||
+                       coalesce(judul_pasal, '') || ' ' ||
+                       konten_pasal),
                        plainto_tsquery('indonesian', $1)) as rank
         FROM pasals
         WHERE peraturan_id = $2
-          AND to_tsvector('indonesian', nomor_pasal || ' ' || COALESCE(judul_pasal, '') || ' ' || konten_pasal)
+          AND to_tsvector('indonesian',
+                       coalesce(nomor_pasal, '') || ' ' ||
+                       coalesce(judul_pasal, '') || ' ' ||
+                       konten_pasal)
               @@ plainto_tsquery('indonesian', $1)
         ORDER BY rank DESC, urutan ASC
         LIMIT $3 OFFSET $4
@@ -270,17 +269,20 @@ class PasalRepository:
         SELECT COUNT(*)
         FROM pasals
         WHERE peraturan_id = $2
-          AND to_tsvector('indonesian', nomor_pasal || ' ' || COALESCE(judul_pasal, '') || ' ' || konten_pasal)
+          AND to_tsvector('indonesian',
+                       coalesce(nomor_pasal, '') || ' ' ||
+                       coalesce(judul_pasal, '') || ' ' ||
+                       konten_pasal)
               @@ plainto_tsquery('indonesian', $1)
         """
 
         try:
             async with get_db_connection() as conn:
                 # Get total count
-                total = await conn.fetchval(count_query, query, peraturan_id)
+                total = await conn.fetchval(count_query, tsquery, peraturan_id)
 
                 # Get data
-                items = await conn.fetch(search_query, query, peraturan_id, limit, skip)
+                items = await conn.fetch(search_query, tsquery, peraturan_id, limit, skip)
 
                 return {
                     "total": total,

@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 
 # Import db connection management
-from ..db.db import get_db_connection
+from db import get_db_connection, execute_query, validate_identifier, sanitize_search_query
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,9 @@ class PeraturanRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                peraturan_id = await conn.fetchval(
-                    insert_query,
+            peraturan_id = await execute_query(
+                insert_query,
+                args=(
                     peraturan_data.get('id'),
                     peraturan_data.get('judul'),
                     peraturan_data.get('nomor'),
@@ -91,9 +91,11 @@ class PeraturanRepository:
                     peraturan_data.get('deskripsi'),
                     peraturan_data.get('metadata', {}),
                     peraturan_data.get('parsed_at')
-                )
-                logger.info(f"Peraturan created/updated: {peraturan_id}")
-                return peraturan_id
+                ),
+                fetch="val"
+            )
+            logger.info(f"Peraturan created/updated: {peraturan_id}")
+            return peraturan_id
         except Exception as e:
             logger.error(f"Failed to create peraturan: {e}")
             raise
@@ -119,13 +121,7 @@ class PeraturanRepository:
         WHERE id = $1
         """
 
-        try:
-            async with get_db_connection() as conn:
-                result = await conn.fetchrow(select_query, peraturan_id)
-                return dict(result) if result else None
-        except Exception as e:
-            logger.error(f"Failed to get peraturan {peraturan_id}: {e}")
-            return None
+        return await execute_query(select_query, args=(peraturan_id,), fetch="one")
 
     async def get_list(
         self,
@@ -156,41 +152,44 @@ class PeraturanRepository:
         Returns:
             Dictionary dengan total, skip, limit, dan items
         """
-        # Build query
+        # Build query dengan prepared statements
         conditions = []
         params = []
-        param_count = 0
 
-        if category:
-            param_count += 1
-            conditions.append(f"kategori = ${param_count}")
+        if category is not None:
+            conditions.append("kategori = $1")
             params.append(category)
 
-        if year:
-            param_count += 1
-            conditions.append(f"tahun = ${param_count}")
+        if year is not None:
+            conditions.append("tahun = $2")
             params.append(year)
 
-        if jenis:
-            param_count += 1
-            conditions.append(f"jenis_peraturan = ${param_count}")
+        if jenis is not None:
+            conditions.append("jenis_peraturan = $3")
             params.append(jenis)
 
-        if status:
-            param_count += 1
-            conditions.append(f"status_peraturan = ${param_count}")
+        if status is not None:
+            conditions.append("status_peraturan = $4")
             params.append(status)
 
-        if search:
-            param_count += 1
-            conditions.append(f"to_tsvector('indonesian', judul || ' ' || COALESCE(nomor, '') || ' ' || COALESCE(tentang, '')) @@ plainto_tsquery('indonesian', ${param_count})")
-            params.append(search)
+        if search is not None:
+            # Sanitize search query untuk tsquery
+            tsquery = sanitize_search_query(search)
+            conditions.append("to_tsvector('indonesian', coalesce(judul, '') || ' ' || coalesce(nomor, '') || ' ' || coalesce(tentang, '')) @@ plainto_tsquery('indonesian', $5)")
+            params.append(tsquery)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
+        # Validate sort_by untuk mencegah SQL injection
+        valid_sort_fields = ['judul', 'nomor', 'tahun', 'kategori',
+                         'created_at', 'updated_at', 'parsed_at']
+        if sort_by and sort_by not in valid_sort_fields:
+            sort_by = 'created_at'
+            logger.warning(f"Invalid sort_by: {sort_by}, using created_at")
+
         # Sorting
         if sort_by:
-            order_clause = f"ORDER BY {sort_by} {sort_order.upper()}"
+            order_clause = f"ORDER BY {sort_by} {'ASC' if sort_order.lower() == 'asc' else 'DESC'}"
         else:
             order_clause = "ORDER BY created_at DESC"
 
@@ -206,9 +205,8 @@ class PeraturanRepository:
         FROM peraturan
         {where_clause}
         {order_clause}
-        LIMIT ${param_count + 1} OFFSET ${param_count + 2}
+        LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
         """
-        params.extend([limit, skip])
 
         try:
             async with get_db_connection() as conn:
@@ -244,13 +242,21 @@ class PeraturanRepository:
         Returns:
             True jika berhasil, False jika tidak
         """
-        # Build SET clause
+        # Build SET clause dengan prepared statements
+        allowed_fields = ['judul', 'nomor', 'tahun', 'kategori', 'url', 'pdf_url',
+                         'jenis_peraturan', 'pemrakarsa', 'tentang',
+                         'tempat_penetapan', 'tanggal_ditetapkan',
+                         'pejabat_menetapkan', 'status_peraturan',
+                         'jumlah_dilihat', 'jumlah_download',
+                         'tanggal_diundangkan', 'tanggal_disahkan',
+                         'deskripsi', 'metadata', 'parsed_at',
+                         'reparse_count', 'last_reparse_at']
         set_clauses = []
         params = []
         param_count = 0
 
         for key, value in update_data.items():
-            if key != 'id':  # Skip id
+            if key in allowed_fields:
                 param_count += 1
                 set_clauses.append(f"{key} = ${param_count}")
                 params.append(value)
@@ -268,11 +274,9 @@ class PeraturanRepository:
         """
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(update_query, *params)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Updated peraturan {peraturan_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(update_query, args=(*params, peraturan_id), fetch="exec")
+            logger.info(f"Updated peraturan {peraturan_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to update peraturan {peraturan_id}: {e}")
             return False
@@ -290,11 +294,9 @@ class PeraturanRepository:
         delete_query = "DELETE FROM peraturan WHERE id = $1"
 
         try:
-            async with get_db_connection() as conn:
-                result = await conn.execute(delete_query, peraturan_id)
-                affected_rows = result.split(" ")[-1]
-                logger.info(f"Deleted peraturan {peraturan_id}: {affected_rows} rows")
-                return int(affected_rows) > 0
+            affected_rows = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            logger.info(f"Deleted peraturan {peraturan_id}: {affected_rows} rows")
+            return affected_rows > 0
         except Exception as e:
             logger.error(f"Failed to delete peraturan {peraturan_id}: {e}")
             return False
@@ -316,14 +318,23 @@ class PeraturanRepository:
         Returns:
             Dictionary dengan total, skip, limit, dan items
         """
+        # Sanitize query untuk tsquery
+        tsquery = sanitize_search_query(query)
+
         search_query = """
         SELECT id, judul, nomor, tahun, kategori, url, pdf_url,
                jenis_peraturan, pemrakarsa, tentang, status_peraturan,
                created_at, updated_at, parsed_at, reparse_count,
-               ts_rank(to_tsvector('indonesian', judul || ' ' || COALESCE(nomor, '') || ' ' || COALESCE(tentang, '')),
+               ts_rank(to_tsvector('indonesian',
+                       coalesce(judul, '') || ' ' ||
+                       coalesce(nomor, '') || ' ' ||
+                       coalesce(tentang, '')),
                        plainto_tsquery('indonesian', $1)) as rank
         FROM peraturan
-        WHERE to_tsvector('indonesian', judul || ' ' || COALESCE(nomor, '') || ' ' || COALESCE(tentang, ''))
+        WHERE to_tsvector('indonesian',
+                       coalesce(judul, '') || ' ' ||
+                       coalesce(nomor, '') || ' ' ||
+                       coalesce(tentang, ''))
               @@ plainto_tsquery('indonesian', $1)
         ORDER BY rank DESC, created_at DESC
         LIMIT $2 OFFSET $3
@@ -332,17 +343,20 @@ class PeraturanRepository:
         count_query = """
         SELECT COUNT(*)
         FROM peraturan
-        WHERE to_tsvector('indonesian', judul || ' ' || COALESCE(nomor, '') || ' ' || COALESCE(tentang, ''))
+        WHERE to_tsvector('indonesian',
+                       coalesce(judul, '') || ' ' ||
+                       coalesce(nomor, '') || ' ' ||
+                       coalesce(tentang, ''))
               @@ plainto_tsquery('indonesian', $1)
         """
 
         try:
             async with get_db_connection() as conn:
                 # Get total count
-                total = await conn.fetchval(count_query, query)
+                total = await conn.fetchval(count_query, tsquery)
 
                 # Get data
-                items = await conn.fetch(search_query, query, limit, skip)
+                items = await conn.fetch(search_query, tsquery, limit, skip)
 
                 return {
                     "total": total,
