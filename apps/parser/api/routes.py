@@ -4,25 +4,26 @@ API routes untuk trigger parsing, cek status, dan query peraturan, bab, pasal, a
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
 
 # Import models dari folder models/ yang sudah dipisah
-from ..models.peraturan import (
+from models.peraturan import (
     PeraturanBase, PeraturanCreate, PeraturanUpdate, PeraturanInDB, PeraturanResponse,
     PeraturanSummary, PeraturanFilter, PeraturanListResponse, PeraturanDetail,
     PeraturanMetadata, ParseResult, PeraturanFullResponse as PeraturanFullResponseModel
 )
-from ..models.bab import (
+from models.bab import (
     BabBase, BabCreate, BabUpdate, BabInDB, BabResponse, BabWithPasalCount,
     BabListResponse, BabFilter
 )
-from ..models.pasal import (
+from models.pasal import (
     PasalBase, PasalCreate, PasalUpdate, PasalInDB, PasalResponse, PasalWithAyatCount,
     PasalWithBabPeraturan, PasalListResponse, PasalFilter
 )
-from ..models.ayat import (
+from models.ayat import (
     AyatBase, AyatCreate, AyatUpdate, AyatInDB, AyatResponse,
     AyatWithPasalBabPeraturan, AyatListResponse, AyatFilter
 )
@@ -97,7 +98,7 @@ async def health_check():
 @router.get("/status", response_model=StatusResponse)
 async def get_status():
     """Get status parsing terakhir"""
-    from ..parser.status import get_parse_status
+    from parser.status import get_parse_status
 
     status_data = get_parse_status()
     return StatusResponse(**status_data)
@@ -118,7 +119,7 @@ async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks
     Returns:
         ParseResponse dengan status job
     """
-    from ..parser.status import get_parse_status
+    from parser.status import get_parse_status
 
     # Cek apakah parsing sedang berjalan
     status = get_parse_status()
@@ -173,7 +174,7 @@ async def list_peraturan(
     Returns:
         List dari peraturan summary
     """
-    from ..db.peraturan import get_peraturan_list
+    from db.peraturan import get_peraturan_list
 
     peraturan = await get_peraturan_list(
         skip=skip,
@@ -198,7 +199,7 @@ async def get_peraturan_detail(peraturan_id: str):
     Returns:
         Detail peraturan lengkap dengan count bab, pasal, ayat
     """
-    from ..db.peraturan import get_peraturan_by_id
+    from db.peraturan import get_peraturan_by_id
 
     peraturan = await get_peraturan_by_id(peraturan_id)
 
@@ -218,7 +219,7 @@ async def get_peraturan_full(peraturan_id: str):
     Returns:
         PeraturanFullResponse dengan peraturan, bab_list, pasal_list, ayat_list
     """
-    from ..db.peraturan import get_peraturan_complete
+    from db.peraturan import get_peraturan_complete
 
     result = await get_peraturan_complete(peraturan_id)
 
@@ -243,7 +244,7 @@ async def reparse_peraturan(peraturan_id: str, background_tasks: BackgroundTasks
     Returns:
         ParseResponse dengan status job
     """
-    from ..db.peraturan import get_peraturan_by_id
+    from db.peraturan import get_peraturan_by_id
 
     # Cek apakah peraturan ada
     peraturan = await get_peraturan_by_id(peraturan_id)
@@ -283,7 +284,7 @@ async def list_bab(
     Returns:
         List dari bab untuk peraturan
     """
-    from ..db.peraturan import get_bab_list
+    from db.peraturan import get_bab_list
 
     bab_result = await get_bab_list(
         peraturan_id=peraturan_id,
@@ -304,7 +305,7 @@ async def get_bab_detail(bab_id: int):
     Returns:
         Detail bab lengkap
     """
-    from ..db.peraturan import get_bab_by_id
+    from db.peraturan import get_bab_by_id
 
     bab = await get_bab_by_id(bab_id)
 
@@ -332,7 +333,7 @@ async def list_pasal_by_bab(
     Returns:
         List dari pasal dalam bab
     """
-    from ..db.peraturan import get_pasal_list
+    from db.peraturan import get_pasal_list
 
     pasal_result = await get_pasal_list(
         peraturan_id=peraturan_id,
@@ -366,7 +367,7 @@ async def list_pasal(
     Returns:
         List dari pasal dengan info bab dan peraturan
     """
-    from ..db.peraturan import get_pasal_list
+    from db.peraturan import get_pasal_list
 
     pasal_result = await get_pasal_list(
         peraturan_id=peraturan_id,
@@ -389,7 +390,7 @@ async def get_pasal_detail(peraturan_id: str, pasal_id: int):
     Returns:
         Detail pasal lengkap dengan count ayat
     """
-    from ..db.peraturan import get_pasal_by_id
+    from db.peraturan import get_pasal_by_id
 
     pasal = await get_pasal_by_id(pasal_id)
 
@@ -417,7 +418,7 @@ async def list_ayat_by_pasal(
     Returns:
         List dari ayat dalam pasal
     """
-    from ..db.peraturan import get_ayat_list
+    from db.peraturan import get_ayat_list
 
     ayat_result = await get_ayat_list(
         pasal_id=pasal_id,
@@ -434,10 +435,10 @@ async def list_ayat_by_pasal(
 
 async def run_parse_task(request: ParseRequest, job_id: str):
     """Background task untuk menjalankan parsing"""
-    from ..parser.status import start_parsing, update_parse_status, update_progress, increment_success_count, increment_failure_count, finish_parsing
-    from ..parser.scraper import scrape_peraturan
-    from ..parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
-    from ..db.peraturan import save_peraturan_complete, update_peraturan
+    from parser.status import start_parsing, update_parse_status, update_progress, increment_success_count, increment_failure_count, finish_parsing
+    from parser.scraper import scrape_peraturan
+    from parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
+    from db.peraturan import save_peraturan_complete, update_peraturan
 
     try:
         start_parsing(job_id)
@@ -532,16 +533,16 @@ async def run_parse_task(request: ParseRequest, job_id: str):
         logger.info(f"[{job_id}] Parsing selesai. Success: {success_count}, Failed: {failed_count}")
 
     except Exception as e:
-        from ..parser.status import finish_parsing
+        from parser.status import finish_parsing
         finish_parsing(job_id=job_id, success=False, error=str(e))
         logger.error(f"[{job_id}] Parsing gagal: {e}")
 
 
 async def run_reparse_task(peraturan_id: str, job_id: str):
     """Background task untuk re-parse peraturan spesifik"""
-    from ..parser.status import update_parse_status, finish_parsing
-    from ..db.peraturan import get_peraturan_by_id, save_peraturan_complete, update_peraturan
-    from ..parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
+    from parser.status import update_parse_status, finish_parsing
+    from db.peraturan import get_peraturan_by_id, save_peraturan_complete, update_peraturan
+    from parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
 
     try:
         update_parse_status(job_id=job_id, is_running=True)

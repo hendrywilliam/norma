@@ -9,6 +9,10 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load env
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -17,11 +21,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Fix Python path untuk import modules
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+
 # Import router
 from api.routes import router as api_router
 
 # Import database functions
-from db.peraturan import init_db_pool, close_db_pool
+from db import init_db_pool, close_db_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,6 +44,9 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         logger.info("Starting Parser API...")
+
+        logger.info("nigga")
+        logger.info(os.getenv("DB_HOST"))
 
         # Initialize database pool
         await init_db_pool(
@@ -118,15 +130,11 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    import uvicorn.logging
-
-    # Configure uvicorn logging
-    uvicorn.config.LOG_LEVEL_CONFIG["uvicorn.access"] = "WARNING"
 
     uvicorn.run(
         "main:app",
         host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", "8000")),
         reload=os.getenv("RELOAD", "false").lower() == "true",
-        log_level=os.getenv("LOG_LEVEL", "info")
+        log_level=getattr(logging, os.getenv("LOG_LEVEL", "info").upper())
     )
