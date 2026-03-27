@@ -42,6 +42,9 @@ class BabRepository:
 
         Returns:
             ID bab yang dibuat
+
+        Raises:
+            Exception: Jika gagal membuat bab
         """
         insert_query = """
         INSERT INTO bab (
@@ -56,7 +59,7 @@ class BabRepository:
         """
 
         try:
-            bab_id = await execute_query(
+            result = await execute_query(
                 insert_query,
                 args=(
                     bab_data.get("peraturan_id"),
@@ -66,6 +69,9 @@ class BabRepository:
                 ),
                 fetch="val",
             )
+            if result is None:
+                raise RuntimeError("Failed to create bab: no ID returned")
+            bab_id: int = result
             logger.info(f"Bab created/updated: {bab_id}")
             return bab_id
         except Exception as e:
@@ -172,7 +178,8 @@ class BabRepository:
         """
 
         try:
-            affected_rows = await execute_query(update_query, args=(*params, bab_id), fetch="exec")
+            result = await execute_query(update_query, args=(*params, bab_id), fetch="exec")
+            affected_rows = result if isinstance(result, int) else 0
             logger.info(f"Updated bab {bab_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -192,7 +199,8 @@ class BabRepository:
         delete_query = "DELETE FROM bab WHERE id = $1"
 
         try:
-            affected_rows = await execute_query(delete_query, args=(bab_id,), fetch="exec")
+            result = await execute_query(delete_query, args=(bab_id,), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Deleted bab {bab_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -212,7 +220,8 @@ class BabRepository:
         delete_query = "DELETE FROM bab WHERE peraturan_id = $1"
 
         try:
-            affected_rows = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            result = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Deleted {affected_rows} bab for peraturan {peraturan_id}")
             return affected_rows
         except Exception as e:

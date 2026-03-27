@@ -43,6 +43,9 @@ class PasalRepository:
 
         Returns:
             ID pasal yang dibuat
+
+        Raises:
+            Exception: Jika gagal membuat pasal
         """
         insert_query = """
         INSERT INTO pasals (
@@ -61,7 +64,7 @@ class PasalRepository:
         """
 
         try:
-            pasal_id = await execute_query(
+            result = await execute_query(
                 insert_query,
                 args=(
                     pasal_data.get("peraturan_id"),
@@ -74,6 +77,9 @@ class PasalRepository:
                 ),
                 fetch="val",
             )
+            if result is None:
+                raise RuntimeError("Failed to create pasal: no ID returned")
+            pasal_id: int = result
             logger.info(f"Pasal created/updated: {pasal_id}")
             return pasal_id
         except Exception as e:
@@ -200,9 +206,8 @@ class PasalRepository:
         """
 
         try:
-            affected_rows = await execute_query(
-                update_query, args=(*params, pasal_id), fetch="exec"
-            )
+            result = await execute_query(update_query, args=(*params, pasal_id), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Updated pasal {pasal_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -222,7 +227,8 @@ class PasalRepository:
         delete_query = "DELETE FROM pasals WHERE id = $1"
 
         try:
-            affected_rows = await execute_query(delete_query, args=(pasal_id,), fetch="exec")
+            result = await execute_query(delete_query, args=(pasal_id,), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Deleted pasal {pasal_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:

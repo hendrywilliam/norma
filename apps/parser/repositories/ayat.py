@@ -29,6 +29,9 @@ class AyatRepository:
 
         Returns:
             ID ayat yang dibuat
+
+        Raises:
+            Exception: Jika gagal membuat ayat
         """
         insert_query = """
         INSERT INTO ayats (
@@ -44,7 +47,7 @@ class AyatRepository:
         """
 
         try:
-            ayat_id = await execute_query(
+            result = await execute_query(
                 insert_query,
                 args=(
                     ayat_data.get("nomor_ayat"),
@@ -55,6 +58,9 @@ class AyatRepository:
                 ),
                 fetch="val",
             )
+            if result is None:
+                raise RuntimeError("Failed to create ayat: no ID returned")
+            ayat_id: int = result
             logger.info(f"Ayat created/updated: {ayat_id}")
             return ayat_id
         except Exception as e:
@@ -146,7 +152,8 @@ class AyatRepository:
         delete_query = "DELETE FROM ayats WHERE id = $1"
 
         try:
-            affected_rows = await execute_query(delete_query, args=(ayat_id,), fetch="exec")
+            result = await execute_query(delete_query, args=(ayat_id,), fetch="exec")
+            affected_rows = result if isinstance(result, int) else 0
             logger.info(f"Deleted ayat {ayat_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:

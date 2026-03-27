@@ -67,7 +67,7 @@ class PeraturanRepository:
         """
 
         try:
-            peraturan_id = await execute_query(
+            result = await execute_query(
                 insert_query,
                 args=(
                     peraturan_data.get("id"),
@@ -94,6 +94,9 @@ class PeraturanRepository:
                 ),
                 fetch="val",
             )
+            if result is None:
+                raise RuntimeError("Failed to create peraturan: no ID returned")
+            peraturan_id: str = result
             logger.info(f"Peraturan created/updated: {peraturan_id}")
             return peraturan_id
         except Exception as e:
@@ -295,9 +298,8 @@ class PeraturanRepository:
         """
 
         try:
-            affected_rows = await execute_query(
-                update_query, args=(*params, peraturan_id), fetch="exec"
-            )
+            result = await execute_query(update_query, args=(*params, peraturan_id), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Updated peraturan {peraturan_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -317,7 +319,8 @@ class PeraturanRepository:
         delete_query = "DELETE FROM peraturan WHERE id = $1"
 
         try:
-            affected_rows = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            result = await execute_query(delete_query, args=(peraturan_id,), fetch="exec")
+            affected_rows: int = result if isinstance(result, int) else 0
             logger.info(f"Deleted peraturan {peraturan_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
