@@ -32,7 +32,7 @@ async def scrape_peraturan(
     category: Optional[str] = None,
     year: Optional[int] = None,
     limit: Optional[int] = None,
-    session: Optional[aiohttp.ClientSession] = None
+    session: Optional[aiohttp.ClientSession] = None,
 ) -> List[Dict]:
     """
     Scrape list peraturan dari peraturan.go.id
@@ -57,7 +57,7 @@ async def scrape_list_peraturan(
     category: Optional[str] = None,
     year: Optional[int] = None,
     limit: Optional[int] = None,
-    session: Optional[aiohttp.ClientSession] = None
+    session: Optional[aiohttp.ClientSession] = None,
 ) -> List[Dict]:
     """
     Scrape list peraturan berdasarkan filter
@@ -85,9 +85,7 @@ async def scrape_list_peraturan(
         while should_continue:
             # Build URL untuk list peraturan
             search_url = f"{BASE_URL}/search"
-            params = {
-                "page": page
-            }
+            params = {"page": page}
 
             if category:
                 params["jenis"] = category
@@ -97,27 +95,29 @@ async def scrape_list_peraturan(
             logger.info(f"Scraping page {page}: category={category}, year={year}")
 
             # Make request
-            async with session.get(search_url, params=params, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            async with session.get(
+                search_url, params=params, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
                 response.raise_for_status()
                 html = await response.text()
 
             # Parse HTML
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
 
             # Extract peraturan items - try multiple selectors for compatibility
             peraturan_items = (
-                soup.find_all('div', class_='item-peraturan') or
-                soup.find_all('div', class_='item') or
-                soup.find_all('div', class_='list-item') or
-                soup.find_all('article') or
-                soup.find_all('div', class_='card')
+                soup.find_all("div", class_="item-peraturan")
+                or soup.find_all("div", class_="item")
+                or soup.find_all("div", class_="list-item")
+                or soup.find_all("article")
+                or soup.find_all("div", class_="card")
             )
 
             # If still no items found, try to extract from table rows
             if not peraturan_items:
-                table = soup.find('table')
+                table = soup.find("table")
                 if table:
-                    peraturan_items = table.find_all('tr')[1:]  # Skip header
+                    peraturan_items = table.find_all("tr")[1:]  # Skip header
 
             if not peraturan_items:
                 logger.info(f"Tidak ada peraturan ditemukan di halaman {page}")
@@ -139,12 +139,14 @@ async def scrape_list_peraturan(
                         return results
 
             # Check next page
-            next_button = soup.find('a', class_='next-page')
-            if not next_button or 'disabled' in next_button.get('class', []):
+            next_button = soup.find("a", class_="next-page")
+            if not next_button or "disabled" in next_button.get("class", []):
                 # Also check for pagination indicators
-                pagination = soup.find('div', class_='pagination') or soup.find('nav', {'aria-label': 'Pagination'})
+                pagination = soup.find("div", class_="pagination") or soup.find(
+                    "nav", {"aria-label": "Pagination"}
+                )
                 if pagination:
-                    next_link = pagination.find('a', string=re.compile(r'Next|Selanjutnya'))
+                    next_link = pagination.find("a", string=re.compile(r"Next|Selanjutnya"))
                     if not next_link:
                         logger.info("Halaman terakhir tercapai")
                         should_continue = False
@@ -166,7 +168,9 @@ async def scrape_list_peraturan(
     return results
 
 
-async def scrape_single_url(url: str, session: Optional[aiohttp.ClientSession] = None) -> List[Dict]:
+async def scrape_single_url(
+    url: str, session: Optional[aiohttp.ClientSession] = None
+) -> List[Dict]:
     """
     Scrape peraturan dari URL spesifik
 
@@ -187,37 +191,22 @@ async def scrape_single_url(url: str, session: Optional[aiohttp.ClientSession] =
     try:
         logger.info(f"Scraping single URL: {url}")
 
-        async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)) as response:
+        async with session.get(
+            url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)
+        ) as response:
             response.raise_for_status()
             html = await response.text()
 
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
 
-        # Extract data lengkap dari detail page
-        peraturan_data = {
-            "url": url,
-            "judul": extract_detail_text(soup, ['h1', 'h2'], ['judul-peraturan', 'title', 'main-title']),
-            "nomor": extract_detail_text(soup, ['span', 'div'], ['nomor-peraturan', 'nomor', 'nomor_uu']),
-            "tahun": extract_year_from_text(extract_detail_text(soup, ['span', 'div'], ['tahun-peraturan', 'tahun'])),
-            "kategori": extract_detail_text(soup, ['span', 'div'], ['kategori-peraturan', 'kategori', 'jenis']),
-            # Field baru sesuai database
-            "jenis_peraturan": extract_detail_text(soup, ['span', 'div'], ['jenis-peraturan', 'jenis']),
-            "pemrakarsa": extract_detail_text(soup, ['span', 'div'], ['pemrakarsa', 'author']),
-            "tentang": extract_detail_text(soup, ['span', 'div'], ['tentang', 'subject', 'topik']),
-            "tempat_penetapan": extract_detail_text(soup, ['span', 'div'], ['tempat-penetapan', 'tempat', 'lokasi']),
-            "tanggal_ditetapkan": parse_date(extract_detail_text(soup, ['span', 'div'], ['tanggal-ditetapkan', 'tanggal-tetap'])),
-            "pejabat_menetapkan": extract_detail_text(soup, ['span', 'div'], ['pejabat-menetapkan', 'pejabat']),
-            "status_peraturan": extract_detail_text(soup, ['span', 'div'], ['status-peraturan', 'status']) or "Berlaku",
-            "jumlah_dilihat": extract_count_from_text(extract_detail_text(soup, ['span', 'div'], ['dilihat', 'view'])),
-            "jumlah_download": extract_count_from_text(extract_detail_text(soup, ['span', 'div'], ['download', 'unduh'])),
-            # Field lama
-            "tanggal_disahkan": parse_date(extract_detail_text(soup, ['span', 'div'], ['tanggal-disahkan'])),
-            "tanggal_diundangkan": parse_date(extract_detail_text(soup, ['span', 'div'], ['tanggal-diundangkan'])),
-            "deskripsi": extract_detail_text(soup, ['div', 'p'], ['deskripsi', 'description', 'abstrak']),
-            "pdf_url": extract_pdf_url(soup)
-        }
+        # Extract data dari table struktur HTML peraturan.go.id
+        peraturan_data = extract_peraturan_detail(soup)
+        peraturan_data["url"] = url
+        logger.info("Peraturan datanya:", peraturan_data)
 
-        return [peraturan_data] if peraturan_data.get('judul') else []
+        logger.info(f"Scraped peraturan: {peraturan_data.get('judul', 'Unknown')}")
+
+        return [peraturan_data] if peraturan_data.get("judul") else []
 
     except Exception as e:
         logger.error(f"Error saat scraping URL {url}: {e}")
@@ -225,6 +214,119 @@ async def scrape_single_url(url: str, session: Optional[aiohttp.ClientSession] =
     finally:
         if close_session and session:
             await session.close()
+
+
+def extract_peraturan_detail(soup: BeautifulSoup) -> Dict:
+    """
+    Extract detail peraturan dari HTML soup berdasarkan struktur table peraturan.go.id
+
+    Struktur HTML yang diharapkan:
+    - <section id="description">
+    - <div class="detail_title_1"><h1>Judul Peraturan</h1></div>
+    - <table class="table caption-top">
+        <tr><th>Nama Field</th><td>Nilai</td></tr>
+
+    Args:
+        soup: BeautifulSoup object dari HTML page
+
+    Returns:
+        Dictionary berisi data peraturan
+    """
+    data = {
+        "judul": None,
+        "nomor": None,
+        "tahun": None,
+        "kategori": None,
+        "jenis_peraturan": None,
+        "pemrakarsa": None,
+        "tentang": None,
+        "tempat_penetapan": None,
+        "tanggal_ditetapkan": None,
+        "pejabat_menetapkan": None,
+        "status_peraturan": "Berlaku",
+        "jumlah_dilihat": 0,
+        "jumlah_download": 0,
+        "tanggal_diundangkan": None,
+        "tahun_pengundangan": None,
+        "nomor_pengundangan": None,
+        "nomor_tambahan": None,
+        "pejabat_pengundangan": None,
+        "pdf_url": None,
+    }
+
+    try:
+        # Extract judul dari h1 di dalam detail_title_1
+        h1_element = soup.find("h1")
+        if h1_element:
+            data["judul"] = h1_element.get_text(strip=True)
+
+        # Mapping field names dari HTML ke data keys
+        field_mapping = {
+            "jenis/bentuk peraturan": "jenis_peraturan",
+            "pemrakarsa": "pemrakarsa",
+            "nomor": "nomor",
+            "tahun": "tahun",
+            "tentang": "tentang",
+            "tempat penetapan": "tempat_penetapan",
+            "ditetapkan tanggal": "tanggal_ditetapkan",
+            "pejabat yang menetapkan": "pejabat_menetapkan",
+            "status": "status_peraturan",
+            "jumlah dilihat": "jumlah_dilihat",
+            "jumlah didownload": "jumlah_download",
+            "tahun pengundangan": "tahun_pengundangan",
+            "nomor pengundangan": "nomor_pengundangan",
+            "nomor tambahan": "nomor_tambahan",
+            "tanggal pengundangan": "tanggal_diundangkan",
+            "pejabat pengundangan": "pejabat_pengundangan",
+            "dokumen peraturan": "pdf_url",
+        }
+
+        # Find all tables
+        tables = soup.find_all("table", class_="table")
+
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                th = row.find("th")
+                td = row.find("td")
+
+                if th and td:
+                    field_name = th.get_text(strip=True).lower()
+                    field_value = td.get_text(strip=True)
+
+                    # Check each field mapping
+                    for key_pattern, data_key in field_mapping.items():
+                        if key_pattern in field_name:
+                            if data_key == "pdf_url":
+                                # Extract PDF URL from anchor tag
+                                pdf_link = td.find("a", href=True)
+                                if pdf_link:
+                                    href = pdf_link.get("href")
+                                    if href:
+                                        data["pdf_url"] = urljoin(BASE_URL, str(href))
+                            elif data_key == "tahun":
+                                data["tahun"] = extract_year_from_text(field_value)
+                            elif data_key == "tanggal_ditetapkan":
+                                data["tanggal_ditetapkan"] = parse_date(field_value)
+                            elif data_key == "tanggal_diundangkan":
+                                data["tanggal_diundangkan"] = parse_date(field_value)
+                            elif data_key in ["jumlah_dilihat", "jumlah_download"]:
+                                data[data_key] = extract_count_from_text(field_value)
+                            elif data_key == "tahun_pengundangan":
+                                data["tahun_pengundangan"] = extract_year_from_text(field_value)
+                            else:
+                                data[data_key] = field_value
+                            break
+        logger.info(data)
+
+        # Set kategori dari jenis_peraturan
+        if data["jenis_peraturan"]:
+            data["kategori"] = data["jenis_peraturan"]
+
+    except Exception as e:
+        logger.error(f"Error extracting peraturan detail: {e}")
+
+    return data
 
 
 async def download_pdf(pdf_url: str, save_path: Optional[str] = None) -> bytes:
@@ -242,12 +344,14 @@ async def download_pdf(pdf_url: str, save_path: Optional[str] = None) -> bytes:
         logger.info(f"Downloading PDF: {pdf_url}")
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(pdf_url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=60)) as response:
+            async with session.get(
+                pdf_url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
                 response.raise_for_status()
                 pdf_content = await response.read()
 
                 if save_path:
-                    with open(save_path, 'wb') as f:
+                    with open(save_path, "wb") as f:
                         f.write(pdf_content)
                     logger.info(f"PDF saved to: {save_path}")
 
@@ -271,23 +375,25 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
     try:
         # Extract judul dan URL - try multiple selectors
         title_element = (
-            item.find('a', class_=lambda x: x and 'judul' in x.lower()) or
-            item.find('a', class_=lambda x: x and 'title' in x.lower()) or
-            item.find('h3').find('a') if item.find('h3') else
-            item.find('h4').find('a') if item.find('h4') else
-            item.find('a')
+            item.find("a", class_=lambda x: x and "judul" in x.lower())
+            or item.find("a", class_=lambda x: x and "title" in x.lower())
+            or item.find("h3").find("a")
+            if item.find("h3")
+            else item.find("h4").find("a")
+            if item.find("h4")
+            else item.find("a")
         )
 
         if not title_element:
             # Try to get from table cells
-            cells = item.find_all(['td', 'th'])
+            cells = item.find_all(["td", "th"])
             if len(cells) > 0:
                 judul = cells[0].get_text(strip=True)
                 detail_url = None
                 # Find link in the item
-                link = item.find('a')
+                link = item.find("a")
                 if link:
-                    detail_url = urljoin(BASE_URL, link.get('href', ''))
+                    detail_url = urljoin(BASE_URL, link.get("href", ""))
 
                 nomor = ""
                 tahun = None
@@ -306,33 +412,35 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
                     "nomor": nomor,
                     "tahun": tahun,
                     "kategori": kategori,
-                    "pdf_url": pdf_url
+                    "pdf_url": pdf_url,
                 }
             return None
 
         judul = title_element.get_text(strip=True)
-        detail_url = urljoin(BASE_URL, title_element.get('href', ''))
+        detail_url = urljoin(BASE_URL, title_element.get("href", ""))
 
         # Extract nomor dan tahun
-        nomor_element = item.find('span', class_='nomor')
+        nomor_element = item.find("span", class_="nomor")
         nomor = nomor_element.get_text(strip=True) if nomor_element else ""
 
-        tahun_element = item.find('span', class_='tahun')
-        tahun = extract_year_from_text(tahun_element.get_text(strip=True)) if tahun_element else None
+        tahun_element = item.find("span", class_="tahun")
+        tahun = (
+            extract_year_from_text(tahun_element.get_text(strip=True)) if tahun_element else None
+        )
 
         # Extract kategori
-        kategori_element = item.find('span', class_='kategori')
+        kategori_element = item.find("span", class_="kategori")
         kategori = kategori_element.get_text(strip=True) if kategori_element else ""
 
         # Extract tanggal
-        tanggal_element = item.find('span', class_='tanggal')
+        tanggal_element = item.find("span", class_="tanggal")
         tanggal = tanggal_element.get_text(strip=True) if tanggal_element else ""
 
         # Extract PDF URL
-        pdf_link = item.find('a', href=True)
+        pdf_link = item.find("a", href=True)
         pdf_url = None
-        if pdf_link and 'pdf' in pdf_link.get('href', '').lower():
-            pdf_url = urljoin(BASE_URL, pdf_link.get('href', ''))
+        if pdf_link and "pdf" in pdf_link.get("href", "").lower():
+            pdf_url = urljoin(BASE_URL, pdf_link.get("href", ""))
 
         return {
             "judul": judul,
@@ -351,7 +459,7 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
             "pejabat_menetapkan": None,
             "status_peraturan": "Berlaku",
             "jumlah_dilihat": 0,
-            "jumlah_download": 0
+            "jumlah_download": 0,
         }
 
     except Exception as e:
@@ -360,7 +468,9 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
 
 
 # Helper Functions
-def extract_detail_text(soup: BeautifulSoup, tags: List[str], classes: Optional[List[str]] = None) -> str:
+def extract_detail_text(
+    soup: BeautifulSoup, tags: List[str], classes: Optional[List[str]] = None
+) -> str:
     """Extract text dari element HTML dengan multiple selector options"""
     try:
         if classes:
@@ -383,7 +493,7 @@ def extract_year_from_text(text: str) -> Optional[int]:
     """Extract tahun dari string text"""
     try:
         # Cari pattern tahun 4 digit
-        match = re.search(r'\b(19|20)\d{2}\b', text)
+        match = re.search(r"\b(19|20)\d{2}\b", text)
         if match:
             return int(match.group())
         return None
@@ -391,8 +501,8 @@ def extract_year_from_text(text: str) -> Optional[int]:
         return None
 
 
-def parse_date(date_string: str) -> Optional[str]:
-    """Parse tanggal dari string format Indonesia ke ISO format"""
+def parse_date(date_string: str) -> Optional[datetime.date]:
+    """Parse tanggal dari string format Indonesia ke datetime.date object"""
     try:
         if not date_string:
             return None
@@ -402,30 +512,39 @@ def parse_date(date_string: str) -> Optional[str]:
 
         # Pattern tanggal Indonesia: 02 Januari 2026
         months_indo = {
-            'januari': '01', 'februari': '02', 'maret': '03', 'april': '04',
-            'mei': '05', 'juni': '06', 'juli': '07', 'agustus': '08',
-            'september': '09', 'oktober': '10', 'november': '11', 'desember': '12'
+            "januari": 1,
+            "februari": 2,
+            "maret": 3,
+            "april": 4,
+            "mei": 5,
+            "juni": 6,
+            "juli": 7,
+            "agustus": 8,
+            "september": 9,
+            "oktober": 10,
+            "november": 11,
+            "desember": 12,
         }
 
         # Match pattern: DD Bulan YYYY
-        match = re.match(r'(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})', date_string, re.IGNORECASE)
+        match = re.match(r"(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})", date_string, re.IGNORECASE)
         if match:
-            day = match.group(1).zfill(2)
+            day = int(match.group(1))
             month_name = match.group(2).lower()
-            year = match.group(3)
+            year = int(match.group(3))
 
             if month_name in months_indo:
                 month = months_indo[month_name]
-                return f"{year}-{month}-{day}"
+                return datetime(year, month, day).date()
 
-        # Try parse as ISO date
+        # Try parse as ISO date (YYYY-MM-DD)
         try:
-            parsed_date = datetime.strptime(date_string, '%Y-%m-%d')
-            return date_string
+            parsed_date = datetime.strptime(date_string, "%Y-%m-%d")
+            return parsed_date.date()
         except:
             pass
 
-        return date_string  # Return original if can't parse
+        return None  # Return None if can't parse
     except:
         return None
 
@@ -437,10 +556,10 @@ def extract_count_from_text(text: str) -> int:
             return 0
 
         # Remove thousand separators
-        text = text.replace('.', '').replace(',', '')
+        text = text.replace(".", "").replace(",", "")
 
         # Extract number
-        match = re.search(r'\d+', text)
+        match = re.search(r"\d+", text)
         if match:
             return int(match.group())
 
@@ -453,14 +572,14 @@ def extract_pdf_url(soup: BeautifulSoup) -> Optional[str]:
     """Extract URL PDF dari detail page"""
     try:
         # Cari link PDF
-        pdf_link = soup.find('a', class_='download-pdf')
+        pdf_link = soup.find("a", class_="download-pdf")
         if pdf_link:
-            return urljoin(BASE_URL, pdf_link.get('href', ''))
+            return urljoin(BASE_URL, pdf_link.get("href", ""))
 
         # Alternatif: cari link dengan text "Download"
-        for a in soup.find_all('a'):
-            if 'download' in a.get_text().lower() and 'pdf' in a.get('href', '').lower():
-                return urljoin(BASE_URL, a.get('href', ''))
+        for a in soup.find_all("a"):
+            if "download" in a.get_text().lower() and "pdf" in a.get("href", "").lower():
+                return urljoin(BASE_URL, a.get("href", ""))
 
         return None
     except:

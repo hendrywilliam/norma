@@ -6,6 +6,7 @@ CRUD operations untuk tabel peraturan
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
+import json
 
 # Import db connection management
 from db import get_db_connection, execute_query, validate_identifier, sanitize_search_query
@@ -67,6 +68,8 @@ class PeraturanRepository:
         """
 
         try:
+            metadata_stringified = json.dumps(peraturan_data.get("metadata"))
+
             result = await execute_query(
                 insert_query,
                 args=(
@@ -89,7 +92,7 @@ class PeraturanRepository:
                     peraturan_data.get("tanggal_diundangkan"),
                     peraturan_data.get("tanggal_disahkan"),
                     peraturan_data.get("deskripsi"),
-                    peraturan_data.get("metadata", {}),
+                    peraturan_data.get(metadata_stringified),
                     peraturan_data.get("parsed_at"),
                 ),
                 fetch="val",

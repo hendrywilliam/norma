@@ -3,21 +3,52 @@ PDF Parser untuk mengekstrak struktur peraturan (bab, pasal, ayat) dari PDF
 """
 
 import pdfplumber
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Union
 import logging
 from io import BytesIO
 import re
 import asyncio
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
 
-async def parse_pdf(pdf_source: Any, extract_images: bool = False) -> Dict:
+async def download_pdf(url: str, session: Optional[aiohttp.ClientSession] = None) -> bytes:
+    """
+    Download PDF dari URL dan return sebagai bytes
+
+    Args:
+        url: URL PDF
+        session: aiohttp ClientSession (optional)
+
+    Returns:
+        PDF content sebagai bytes
+    """
+    close_session = False
+    if session is None:
+        session = aiohttp.ClientSession()
+        close_session = True
+
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        async with session.get(
+            url, headers=headers, timeout=aiohttp.ClientTimeout(total=60)
+        ) as response:
+            response.raise_for_status()
+            pdf_bytes = await response.read()
+            logger.info(f"Downloaded PDF: {len(pdf_bytes)} bytes from {url}")
+            return pdf_bytes
+    finally:
+        if close_session and session:
+            await session.close()
+
+
+async def parse_pdf(pdf_source: Union[str, bytes, Any], extract_images: bool = False) -> Dict:
     """
     Parse PDF dan extract konten, metadata, dan struktur peraturan
 
     Args:
-        pdf_source: PDF file path, bytes, atau file-like object
+        pdf_source: PDF file path, URL, bytes, atau file-like object
         extract_images: Apakah extract images (default False)
 
     Returns:
@@ -28,6 +59,14 @@ async def parse_pdf(pdf_source: Any, extract_images: bool = False) -> Dict:
         - structure: Struktur peraturan (bab, pasal, ayat)
         - tables: List tables jika ada (opsional)
     """
+    # Jika pdf_source adalah URL (string yang dimulai dengan http), download dulu
+    if isinstance(pdf_source, str) and (
+        pdf_source.startswith("http://") or pdf_source.startswith("https://")
+    ):
+        logger.info(f"Detected URL, downloading PDF from: {pdf_source}")
+        pdf_bytes = await download_pdf(pdf_source)
+        pdf_source = BytesIO(pdf_bytes)
+
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(None, _parse_pdf_sync, pdf_source, extract_images)
     return result
@@ -464,7 +503,9 @@ async def parse_peraturan_complete(
         structure = parse_result["structure"]
 
         # Extract konten lengkap untuk bab dan pasal
-        content_structure = extract_peraturan_content_by_structure(parse_result["pages"], structure)
+        # pages berupa list of dict dengan key "text", extract text saja
+        page_texts = [page.get("text", "") for page in parse_result["pages"]]
+        content_structure = extract_peraturan_content_by_structure(page_texts, structure)
 
         # Build hasil yang database-ready
         result = {
