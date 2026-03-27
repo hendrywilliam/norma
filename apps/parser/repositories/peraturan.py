@@ -3,7 +3,6 @@ Repository untuk Tabel Peraturan
 CRUD operations untuk tabel peraturan
 """
 
-import asyncpg
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
@@ -17,6 +16,7 @@ logger = logging.getLogger(__name__)
 # ========================================
 # Repository Class untuk Peraturan
 # ========================================
+
 
 class PeraturanRepository:
     """Repository class untuk tabel peraturan"""
@@ -70,29 +70,29 @@ class PeraturanRepository:
             peraturan_id = await execute_query(
                 insert_query,
                 args=(
-                    peraturan_data.get('id'),
-                    peraturan_data.get('judul'),
-                    peraturan_data.get('nomor'),
-                    peraturan_data.get('tahun'),
-                    peraturan_data.get('kategori'),
-                    peraturan_data.get('url'),
-                    peraturan_data.get('pdf_url'),
-                    peraturan_data.get('jenis_peraturan'),
-                    peraturan_data.get('pemrakarsa'),
-                    peraturan_data.get('tentang'),
-                    peraturan_data.get('tempat_penetapan'),
-                    peraturan_data.get('tanggal_ditetapkan'),
-                    peraturan_data.get('pejabat_menetapkan'),
-                    peraturan_data.get('status_peraturan', 'Berlaku'),
-                    peraturan_data.get('jumlah_dilihat', 0),
-                    peraturan_data.get('jumlah_download', 0),
-                    peraturan_data.get('tanggal_diundangkan'),
-                    peraturan_data.get('tanggal_disahkan'),
-                    peraturan_data.get('deskripsi'),
-                    peraturan_data.get('metadata', {}),
-                    peraturan_data.get('parsed_at')
+                    peraturan_data.get("id"),
+                    peraturan_data.get("judul"),
+                    peraturan_data.get("nomor"),
+                    peraturan_data.get("tahun"),
+                    peraturan_data.get("kategori"),
+                    peraturan_data.get("url"),
+                    peraturan_data.get("pdf_url"),
+                    peraturan_data.get("jenis_peraturan"),
+                    peraturan_data.get("pemrakarsa"),
+                    peraturan_data.get("tentang"),
+                    peraturan_data.get("tempat_penetapan"),
+                    peraturan_data.get("tanggal_ditetapkan"),
+                    peraturan_data.get("pejabat_menetapkan"),
+                    peraturan_data.get("status_peraturan", "Berlaku"),
+                    peraturan_data.get("jumlah_dilihat", 0),
+                    peraturan_data.get("jumlah_download", 0),
+                    peraturan_data.get("tanggal_diundangkan"),
+                    peraturan_data.get("tanggal_disahkan"),
+                    peraturan_data.get("deskripsi"),
+                    peraturan_data.get("metadata", {}),
+                    peraturan_data.get("parsed_at"),
                 ),
-                fetch="val"
+                fetch="val",
             )
             logger.info(f"Peraturan created/updated: {peraturan_id}")
             return peraturan_id
@@ -133,7 +133,7 @@ class PeraturanRepository:
         status: Optional[str] = None,
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
-        sort_order: str = "desc"
+        sort_order: str = "desc",
     ) -> Dict[str, Any]:
         """
         Get list peraturan dengan filter dan pagination
@@ -157,34 +157,42 @@ class PeraturanRepository:
         params = []
 
         if category is not None:
-            conditions.append("kategori = $1")
             params.append(category)
+            conditions.append(f"kategori = ${len(params)}")
 
         if year is not None:
-            conditions.append("tahun = $2")
             params.append(year)
+            conditions.append(f"tahun = ${len(params)}")
 
         if jenis is not None:
-            conditions.append("jenis_peraturan = $3")
             params.append(jenis)
+            conditions.append(f"jenis_peraturan = ${len(params)}")
 
         if status is not None:
-            conditions.append("status_peraturan = $4")
             params.append(status)
+            conditions.append(f"status_peraturan = ${len(params)}")
 
-        if search is not None:
-            # Sanitize search query untuk tsquery
+        if search:
             tsquery = sanitize_search_query(search)
-            conditions.append("to_tsvector('indonesian', coalesce(judul, '') || ' ' || coalesce(nomor, '') || ' ' || coalesce(tentang, '')) @@ plainto_tsquery('indonesian', $5)")
             params.append(tsquery)
+            conditions.append(
+                f"to_tsvector('indonesian', coalesce(judul, '') || ' ' || coalesce(nomor, '') || ' ' || coalesce(tentang, '')) @@ plainto_tsquery('indonesian', ${len(params)})"
+            )
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         # Validate sort_by untuk mencegah SQL injection
-        valid_sort_fields = ['judul', 'nomor', 'tahun', 'kategori',
-                         'created_at', 'updated_at', 'parsed_at']
+        valid_sort_fields = [
+            "judul",
+            "nomor",
+            "tahun",
+            "kategori",
+            "created_at",
+            "updated_at",
+            "parsed_at",
+        ]
         if sort_by and sort_by not in valid_sort_fields:
-            sort_by = 'created_at'
+            sort_by = "created_at"
             logger.warning(f"Invalid sort_by: {sort_by}, using created_at")
 
         # Sorting
@@ -196,7 +204,11 @@ class PeraturanRepository:
         # Get total count
         count_query = f"SELECT COUNT(*) FROM peraturan {where_clause}"
 
-        # Get data
+        # Get data - use explicit parameter numbers
+        param_count = len(params)
+        limit_param = f"${param_count + 1}"
+        offset_param = f"${param_count + 2}"
+
         data_query = f"""
         SELECT id, judul, nomor, tahun, kategori, url, pdf_url,
                jenis_peraturan, pemrakarsa, tentang, status_peraturan,
@@ -205,31 +217,24 @@ class PeraturanRepository:
         FROM peraturan
         {where_clause}
         {order_clause}
-        LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
+        LIMIT {limit_param} OFFSET {offset_param}
         """
 
         try:
             async with get_db_connection() as conn:
                 # Get total count
                 total = await conn.fetchval(count_query, *params)
-
                 # Get data
-                items = await conn.fetch(data_query, *params)
-
+                items = await conn.fetch(data_query, *params, limit, skip)
                 return {
                     "total": total,
                     "skip": skip,
                     "limit": limit,
-                    "items": [dict(item) for item in items]
+                    "items": [dict(item) for item in items],
                 }
         except Exception as e:
             logger.error(f"Failed to get peraturan list: {e}")
-            return {
-                "total": 0,
-                "skip": skip,
-                "limit": limit,
-                "items": []
-            }
+            return {"total": 0, "skip": skip, "limit": limit, "items": []}
 
     async def update(self, peraturan_id: str, update_data: Dict[str, Any]) -> bool:
         """
@@ -243,14 +248,30 @@ class PeraturanRepository:
             True jika berhasil, False jika tidak
         """
         # Build SET clause dengan prepared statements
-        allowed_fields = ['judul', 'nomor', 'tahun', 'kategori', 'url', 'pdf_url',
-                         'jenis_peraturan', 'pemrakarsa', 'tentang',
-                         'tempat_penetapan', 'tanggal_ditetapkan',
-                         'pejabat_menetapkan', 'status_peraturan',
-                         'jumlah_dilihat', 'jumlah_download',
-                         'tanggal_diundangkan', 'tanggal_disahkan',
-                         'deskripsi', 'metadata', 'parsed_at',
-                         'reparse_count', 'last_reparse_at']
+        allowed_fields = [
+            "judul",
+            "nomor",
+            "tahun",
+            "kategori",
+            "url",
+            "pdf_url",
+            "jenis_peraturan",
+            "pemrakarsa",
+            "tentang",
+            "tempat_penetapan",
+            "tanggal_ditetapkan",
+            "pejabat_menetapkan",
+            "status_peraturan",
+            "jumlah_dilihat",
+            "jumlah_download",
+            "tanggal_diundangkan",
+            "tanggal_disahkan",
+            "deskripsi",
+            "metadata",
+            "parsed_at",
+            "reparse_count",
+            "last_reparse_at",
+        ]
         set_clauses = []
         params = []
         param_count = 0
@@ -269,12 +290,14 @@ class PeraturanRepository:
 
         update_query = f"""
         UPDATE peraturan
-        SET {', '.join(set_clauses)}
+        SET {", ".join(set_clauses)}
         WHERE id = ${param_count + 1}
         """
 
         try:
-            affected_rows = await execute_query(update_query, args=(*params, peraturan_id), fetch="exec")
+            affected_rows = await execute_query(
+                update_query, args=(*params, peraturan_id), fetch="exec"
+            )
             logger.info(f"Updated peraturan {peraturan_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -301,12 +324,7 @@ class PeraturanRepository:
             logger.error(f"Failed to delete peraturan {peraturan_id}: {e}")
             return False
 
-    async def search(
-        self,
-        query: str,
-        skip: int = 0,
-        limit: int = 20
-    ) -> Dict[str, Any]:
+    async def search(self, query: str, skip: int = 0, limit: int = 20) -> Dict[str, Any]:
         """
         Full-text search peraturan menggunakan PostgreSQL full-text search
 
@@ -321,7 +339,7 @@ class PeraturanRepository:
         # Sanitize query untuk tsquery
         tsquery = sanitize_search_query(query)
 
-        search_query = """
+        search_sql = """
         SELECT id, judul, nomor, tahun, kategori, url, pdf_url,
                jenis_peraturan, pemrakarsa, tentang, status_peraturan,
                created_at, updated_at, parsed_at, reparse_count,
@@ -340,7 +358,7 @@ class PeraturanRepository:
         LIMIT $2 OFFSET $3
         """
 
-        count_query = """
+        count_sql = """
         SELECT COUNT(*)
         FROM peraturan
         WHERE to_tsvector('indonesian',
@@ -353,25 +371,20 @@ class PeraturanRepository:
         try:
             async with get_db_connection() as conn:
                 # Get total count
-                total = await conn.fetchval(count_query, tsquery)
+                total = await conn.fetchval(count_sql, tsquery)
 
                 # Get data
-                items = await conn.fetch(search_query, tsquery, limit, skip)
+                items = await conn.fetch(search_sql, tsquery, limit, skip)
 
                 return {
                     "total": total,
                     "skip": skip,
                     "limit": limit,
-                    "items": [dict(item) for item in items]
+                    "items": [dict(item) for item in items],
                 }
         except Exception as e:
             logger.error(f"Failed to search peraturan: {e}")
-            return {
-                "total": 0,
-                "skip": skip,
-                "limit": limit,
-                "items": []
-            }
+            return {"total": 0, "skip": skip, "limit": limit, "items": []}
 
     async def get_stats(self) -> Dict[str, Any]:
         """
@@ -420,15 +433,11 @@ class PeraturanRepository:
                 return {
                     "general": general_stats,
                     "by_category": category_stats,
-                    "by_year": year_stats
+                    "by_year": year_stats,
                 }
         except Exception as e:
             logger.error(f"Failed to get peraturan stats: {e}")
-            return {
-                "general": {},
-                "by_category": [],
-                "by_year": []
-            }
+            return {"general": {}, "by_category": [], "by_year": []}
 
 
 # Singleton repository instance

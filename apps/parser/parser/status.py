@@ -22,7 +22,7 @@ _parse_status: Dict = {
     "error": None,
     "progress": 0,
     "total_items": 0,
-    "processed_items": 0
+    "processed_items": 0,
 }
 
 # Thread lock untuk concurrent access
@@ -51,7 +51,7 @@ def update_parse_status(
     error: Optional[str] = None,
     progress: Optional[int] = None,
     total_items: Optional[int] = None,
-    processed_items: Optional[int] = None
+    processed_items: Optional[int] = None,
 ) -> None:
     """
     Update status parsing
@@ -122,35 +122,35 @@ def start_parsing(job_id: str, total_items: int = 0) -> None:
         progress=0,
         total_items=total_items,
         processed_items=0,
-        current_task="Initializing"
+        current_task="Initializing",
     )
 
     logger.info(f"Started parsing job {job_id} with {total_items} items")
 
 
-def finish_parsing(success: bool = True, error: Optional[str] = None) -> None:
+def finish_parsing(
+    job_id: Optional[str] = None, success: bool = True, error: Optional[str] = None
+) -> None:
     """
     Selesaikan parsing job
 
     Args:
+        job_id: ID dari parsing job
         success: Apakah parsing berhasil
         error: Error message jika gagal
     """
     if success:
         update_parse_status(
+            job_id=job_id,
             is_running=False,
             last_success=datetime.now(),
             progress=100,
             current_task=None,
-            error=None
+            error=None,
         )
         logger.info("Parsing job finished successfully")
     else:
-        update_parse_status(
-            is_running=False,
-            error=error,
-            current_task=None
-        )
+        update_parse_status(job_id=job_id, is_running=False, error=error, current_task=None)
         logger.error(f"Parsing job failed: {error}")
 
 
@@ -166,10 +166,7 @@ def update_progress(current: int, total: int, task: Optional[str] = None) -> Non
     progress = int((current / total) * 100) if total > 0 else 0
 
     update_parse_status(
-        progress=progress,
-        processed_items=current,
-        total_items=total,
-        current_task=task
+        progress=progress, processed_items=current, total_items=total, current_task=task
     )
 
     logger.debug(f"Progress: {progress}% ({current}/{total}) - {task}")
@@ -201,19 +198,21 @@ def increment_failure_count(error: Optional[str] = None) -> None:
 def reset_status() -> None:
     """Reset status parsing ke nilai awal"""
     with _status_lock:
-        _parse_status.update({
-            "is_running": False,
-            "job_id": None,
-            "current_task": None,
-            "last_run": None,
-            "last_success": None,
-            "total_parsed": 0,
-            "total_failed": 0,
-            "error": None,
-            "progress": 0,
-            "total_items": 0,
-            "processed_items": 0
-        })
+        _parse_status.update(
+            {
+                "is_running": False,
+                "job_id": None,
+                "current_task": None,
+                "last_run": None,
+                "last_success": None,
+                "total_parsed": 0,
+                "total_failed": 0,
+                "error": None,
+                "progress": 0,
+                "total_items": 0,
+                "processed_items": 0,
+            }
+        )
 
     logger.info("Parsing status reset")
 
@@ -251,5 +250,5 @@ def get_progress() -> Dict[str, int]:
         return {
             "progress": _parse_status["progress"],
             "processed_items": _parse_status["processed_items"],
-            "total_items": _parse_status["total_items"]
+            "total_items": _parse_status["total_items"],
         }

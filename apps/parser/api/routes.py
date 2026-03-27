@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize router
 router = APIRouter(
-    prefix="/api",
     tags=["Parser API"]
 )
 
@@ -174,9 +173,9 @@ async def list_peraturan(
     Returns:
         List dari peraturan summary
     """
-    from db.peraturan import get_peraturan_list
+    from repositories.peraturan import peraturan_repository
 
-    peraturan = await get_peraturan_list(
+    peraturan = await peraturan_repository.get_list(
         skip=skip,
         limit=limit,
         category=category,
@@ -199,9 +198,9 @@ async def get_peraturan_detail(peraturan_id: str):
     Returns:
         Detail peraturan lengkap dengan count bab, pasal, ayat
     """
-    from db.peraturan import get_peraturan_by_id
+    from repositories.peraturan import peraturan_repository
 
-    peraturan = await get_peraturan_by_id(peraturan_id)
+    peraturan = await peraturan_repository.get_by_id(peraturan_id)
 
     if not peraturan:
         raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
@@ -219,9 +218,25 @@ async def get_peraturan_full(peraturan_id: str):
     Returns:
         PeraturanFullResponse dengan peraturan, bab_list, pasal_list, ayat_list
     """
-    from db.peraturan import get_peraturan_complete
+    from repositories.peraturan import peraturan_repository
+    from repositories.bab import bab_repository
+    from repositories.pasal import pasal_repository
+    from repositories.ayat import ayat_repository
 
-    result = await get_peraturan_complete(peraturan_id)
+    peraturan = await peraturan_repository.get_by_id(peraturan_id)
+    if not peraturan:
+        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+
+    bab_result = await bab_repository.get_list(peraturan_id)
+    pasal_result = await pasal_repository.get_list(peraturan_id)
+    ayat_result = await ayat_repository.get_list_by_peraturan(peraturan_id)
+
+    result = {
+        "peraturan": peraturan,
+        "bab_list": bab_result.get("items", []),
+        "pasal_list": pasal_result.get("items", []),
+        "ayat_list": ayat_result
+    }
 
     if not result:
         raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
@@ -244,10 +259,10 @@ async def reparse_peraturan(peraturan_id: str, background_tasks: BackgroundTasks
     Returns:
         ParseResponse dengan status job
     """
-    from db.peraturan import get_peraturan_by_id
+    from repositories.peraturan import peraturan_repository
 
     # Cek apakah peraturan ada
-    peraturan = await get_peraturan_by_id(peraturan_id)
+    peraturan = await peraturan_repository.get_by_id(peraturan_id)
     if not peraturan:
         raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
 
@@ -284,9 +299,9 @@ async def list_bab(
     Returns:
         List dari bab untuk peraturan
     """
-    from db.peraturan import get_bab_list
+    from repositories.bab import bab_repository
 
-    bab_result = await get_bab_list(
+    bab_result = await bab_repository.get_list(
         peraturan_id=peraturan_id,
         skip=skip,
         limit=limit
@@ -305,9 +320,9 @@ async def get_bab_detail(bab_id: int):
     Returns:
         Detail bab lengkap
     """
-    from db.peraturan import get_bab_by_id
+    from repositories.bab import bab_repository
 
-    bab = await get_bab_by_id(bab_id)
+    bab = await bab_repository.get_by_id(bab_id)
 
     if not bab:
         raise HTTPException(status_code=404, detail="Bab tidak ditemukan")
@@ -333,9 +348,9 @@ async def list_pasal_by_bab(
     Returns:
         List dari pasal dalam bab
     """
-    from db.peraturan import get_pasal_list
+    from repositories.pasal import pasal_repository
 
-    pasal_result = await get_pasal_list(
+    pasal_result = await pasal_repository.get_list(
         peraturan_id=peraturan_id,
         bab_id=bab_id,
         skip=skip,
@@ -367,9 +382,9 @@ async def list_pasal(
     Returns:
         List dari pasal dengan info bab dan peraturan
     """
-    from db.peraturan import get_pasal_list
+    from repositories.pasal import pasal_repository
 
-    pasal_result = await get_pasal_list(
+    pasal_result = await pasal_repository.get_list(
         peraturan_id=peraturan_id,
         bab_id=bab_id,
         skip=skip,
@@ -390,9 +405,9 @@ async def get_pasal_detail(peraturan_id: str, pasal_id: int):
     Returns:
         Detail pasal lengkap dengan count ayat
     """
-    from db.peraturan import get_pasal_by_id
+    from repositories.pasal import pasal_repository
 
-    pasal = await get_pasal_by_id(pasal_id)
+    pasal = await pasal_repository.get_by_id(pasal_id)
 
     if not pasal:
         raise HTTPException(status_code=404, detail="Pasal tidak ditemukan")
@@ -418,15 +433,15 @@ async def list_ayat_by_pasal(
     Returns:
         List dari ayat dalam pasal
     """
-    from db.peraturan import get_ayat_list
+    from repositories.ayat import ayat_repository
 
-    ayat_result = await get_ayat_list(
+    items = await ayat_repository.get_list_by_pasal(
         pasal_id=pasal_id,
         skip=skip,
         limit=limit
     )
 
-    return ayat_result["items"]
+    return items if items else []
 
 
 # ========================================
@@ -438,7 +453,10 @@ async def run_parse_task(request: ParseRequest, job_id: str):
     from parser.status import start_parsing, update_parse_status, update_progress, increment_success_count, increment_failure_count, finish_parsing
     from parser.scraper import scrape_peraturan
     from parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
-    from db.peraturan import save_peraturan_complete, update_peraturan
+    from repositories.peraturan import peraturan_repository
+    from repositories.bab import bab_repository
+    from repositories.pasal import pasal_repository
+    from repositories.ayat import ayat_repository
 
     try:
         start_parsing(job_id)
@@ -488,16 +506,23 @@ async def run_parse_task(request: ParseRequest, job_id: str):
                     ayat_data=pdf_result["ayat"]
                 )
 
-                # Save ke database
-                await save_peraturan_complete(
-                    peraturan_data=peraturan_final,
-                    bab_list=bab_list,
-                    pasal_list=pasal_list,
-                    ayat_list=ayat_list
-                )
+                # Save peraturan
+                await peraturan_repository.create(peraturan_final)
+
+                # Save bab
+                for bab in bab_list:
+                    await bab_repository.create(bab)
+
+                # Save pasal
+                for pasal in pasal_list:
+                    await pasal_repository.create(pasal)
+
+                # Save ayat
+                for ayat in ayat_list:
+                    await ayat_repository.create(ayat)
 
                 # Update parsed_at di peraturan
-                await update_peraturan(
+                await peraturan_repository.update(
                     peraturan_data["id"],
                     {
                         "parsed_at": datetime.now(),
@@ -541,14 +566,17 @@ async def run_parse_task(request: ParseRequest, job_id: str):
 async def run_reparse_task(peraturan_id: str, job_id: str):
     """Background task untuk re-parse peraturan spesifik"""
     from parser.status import update_parse_status, finish_parsing
-    from db.peraturan import get_peraturan_by_id, save_peraturan_complete, update_peraturan
+    from repositories.peraturan import peraturan_repository
+    from repositories.bab import bab_repository
+    from repositories.pasal import pasal_repository
+    from repositories.ayat import ayat_repository
     from parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
 
     try:
         update_parse_status(job_id=job_id, is_running=True)
 
         # Get peraturan dari database
-        peraturan = await get_peraturan_by_id(peraturan_id)
+        peraturan = await peraturan_repository.get_by_id(peraturan_id)
 
         logger.info(f"[{job_id}] Mulai re-parse: {peraturan['judul']}")
 
@@ -571,16 +599,21 @@ async def run_reparse_task(peraturan_id: str, job_id: str):
         pasal_list = pdf_result["pasal"]
         ayat_list = pdf_result["ayat"]
 
+        # Delete old bab, pasals, ayats for this peraturan
+        await bab_repository.delete_by_peraturan(peraturan_id)
+
         # Re-save ke database (akan update existing bab, pasals, ayats)
-        await save_peraturan_complete(
-            peraturan_data=peraturan,  # Peraturan info tetap sama
-            bab_list=bab_list,
-            pasal_list=pasal_list,
-            ayat_list=ayat_list
-        )
+        for bab in bab_list:
+            await bab_repository.create(bab)
+
+        for pasal in pasal_list:
+            await pasal_repository.create(pasal)
+
+        for ayat in ayat_list:
+            await ayat_repository.create(ayat)
 
         # Update reparse count dan last reparse
-        await update_peraturan(
+        await peraturan_repository.update(
             peraturan_id,
             {
                 "reparse_count": peraturan.get("reparse_count", 0) + 1,

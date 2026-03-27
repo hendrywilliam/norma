@@ -45,7 +45,6 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Starting Parser API...")
 
-        logger.info("nigga")
         logger.info(os.getenv("DB_HOST"))
 
         # Initialize database pool

@@ -3,7 +3,6 @@ Repository untuk Tabel Bab
 CRUD operations untuk tabel bab
 """
 
-import asyncpg
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
@@ -13,8 +12,14 @@ from db import get_db_connection, execute_query, validate_identifier
 
 # Import Bab model
 from models.bab import (
-    BabBase, BabCreate, BabUpdate, BabInDB, BabResponse,
-    BabWithPasalCount, BabWithPeraturanInfo, BabListResponse
+    BabBase,
+    BabCreate,
+    BabUpdate,
+    BabInDB,
+    BabResponse,
+    BabWithPasalCount,
+    BabWithPeraturanInfo,
+    BabListResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,6 +28,7 @@ logger = logging.getLogger(__name__)
 # ========================================
 # Repository Class untuk Bab
 # ========================================
+
 
 class BabRepository:
     """Repository class untuk tabel bab"""
@@ -53,12 +59,12 @@ class BabRepository:
             bab_id = await execute_query(
                 insert_query,
                 args=(
-                    bab_data.get('peraturan_id'),
-                    bab_data.get('nomor_bab'),
-                    bab_data.get('judul_bab'),
-                    bab_data.get('urutan')
+                    bab_data.get("peraturan_id"),
+                    bab_data.get("nomor_bab"),
+                    bab_data.get("judul_bab"),
+                    bab_data.get("urutan"),
                 ),
-                fetch="val"
+                fetch="val",
             )
             logger.info(f"Bab created/updated: {bab_id}")
             return bab_id
@@ -86,12 +92,7 @@ class BabRepository:
 
         return await execute_query(select_query, args=(bab_id,), fetch="one")
 
-    async def get_list(
-        self,
-        peraturan_id: str,
-        skip: int = 0,
-        limit: int = 50
-    ) -> Dict[str, Any]:
+    async def get_list(self, peraturan_id: str, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
         """
         Get list bab by peraturan_id dengan pagination
 
@@ -129,16 +130,11 @@ class BabRepository:
                     "total": total,
                     "skip": skip,
                     "limit": limit,
-                    "items": [dict(item) for item in items]
+                    "items": [dict(item) for item in items],
                 }
         except Exception as e:
             logger.error(f"Failed to get bab list for {peraturan_id}: {e}")
-            return {
-                "total": 0,
-                "skip": skip,
-                "limit": limit,
-                "items": []
-            }
+            return {"total": 0, "skip": skip, "limit": limit, "items": []}
 
     async def update(self, bab_id: int, update_data: Dict[str, Any]) -> bool:
         """
@@ -152,7 +148,7 @@ class BabRepository:
             True jika berhasil, False jika tidak
         """
         # Build SET clause dengan prepared statement
-        allowed_fields = ['nomor_bab', 'judul_bab', 'urutan']
+        allowed_fields = ["nomor_bab", "judul_bab", "urutan"]
         set_clauses = []
         params = []
         param_count = 0
@@ -171,7 +167,7 @@ class BabRepository:
 
         update_query = f"""
         UPDATE bab
-        SET {', '.join(set_clauses)}
+        SET {", ".join(set_clauses)}
         WHERE id = ${param_count + 1}
         """
 

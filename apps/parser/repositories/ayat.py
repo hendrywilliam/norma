@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Repository Class untuk Ayat
 # ========================================
 
+
 class AyatRepository:
     """Repository class untuk tabel ayat"""
 
@@ -30,15 +31,15 @@ class AyatRepository:
             ID ayat yang dibuat
         """
         insert_query = """
-        INSERT INTO ayat (
-            ayat_number, isi, pasal_id, peraturan_id
+        INSERT INTO ayats (
+            nomor_ayat, konten_ayat, urutan, metadata, pasal_id
         )
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (id) DO UPDATE SET
-            ayat_number = EXCLUDED.ayat_number,
-            isi = EXCLUDED.isi,
-            pasal_id = EXCLUDED.pasal_id,
-            peraturan_id = EXCLUDED.peraturan_id
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (pasal_id, nomor_ayat) DO UPDATE SET
+            konten_ayat = EXCLUDED.konten_ayat,
+            urutan = EXCLUDED.urutan,
+            metadata = EXCLUDED.metadata,
+            updated_at = CURRENT_TIMESTAMP
         RETURNING id
         """
 
@@ -46,12 +47,13 @@ class AyatRepository:
             ayat_id = await execute_query(
                 insert_query,
                 args=(
-                    ayat_data.get('ayat_number'),
-                    ayat_data.get('isi'),
-                    ayat_data.get('pasal_id'),
-                    ayat_data.get('peraturan_id')
+                    ayat_data.get("nomor_ayat"),
+                    ayat_data.get("konten_ayat"),
+                    ayat_data.get("urutan"),
+                    ayat_data.get("metadata", {}),
+                    ayat_data.get("pasal_id"),
                 ),
-                fetch="val"
+                fetch="val",
             )
             logger.info(f"Ayat created/updated: {ayat_id}")
             return ayat_id
@@ -70,19 +72,16 @@ class AyatRepository:
             Dictionary data ayat atau None jika tidak ditemukan
         """
         select_query = """
-        SELECT id, ayat_number, isi, pasal_id, peraturan_id,
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id,
                created_at, updated_at
-        FROM ayat
+        FROM ayats
         WHERE id = $1
         """
 
         return await execute_query(select_query, args=(ayat_id,), fetch="one")
 
     async def get_list_by_pasal(
-        self,
-        pasal_id: int,
-        skip: int = 0,
-        limit: int = 50
+        self, pasal_id: int, skip: int = 0, limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
         Get list ayat untuk pasal spesifik
@@ -96,11 +95,11 @@ class AyatRepository:
             List dari ayat dictionaries
         """
         select_query = """
-        SELECT id, ayat_number, isi, pasal_id, peraturan_id,
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id,
                created_at, updated_at
-        FROM ayat
+        FROM ayats
         WHERE pasal_id = $1
-        ORDER BY ayat_number ASC
+        ORDER BY urutan ASC
         LIMIT $2 OFFSET $3
         """
 
@@ -108,10 +107,7 @@ class AyatRepository:
         return result if result else []
 
     async def get_list_by_peraturan(
-        self,
-        peraturan_id: str,
-        skip: int = 0,
-        limit: int = 100
+        self, peraturan_id: str, skip: int = 0, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
         Get list ayat untuk peraturan spesifik
@@ -125,11 +121,12 @@ class AyatRepository:
             List dari ayat dictionaries
         """
         select_query = """
-        SELECT id, ayat_number, isi, pasal_id, peraturan_id,
-               created_at, updated_at
-        FROM ayat
-        WHERE peraturan_id = $1
-        ORDER BY pasal_id, ayat_number ASC
+        SELECT a.id, a.nomor_ayat, a.konten_ayat, a.urutan, a.metadata, a.pasal_id,
+               a.created_at, a.updated_at
+        FROM ayats a
+        JOIN pasals p ON a.pasal_id = p.id
+        WHERE p.peraturan_id = $1
+        ORDER BY a.pasal_id, a.urutan ASC
         LIMIT $2 OFFSET $3
         """
 
@@ -146,7 +143,7 @@ class AyatRepository:
         Returns:
             True jika berhasil, False jika tidak
         """
-        delete_query = "DELETE FROM ayat WHERE id = $1"
+        delete_query = "DELETE FROM ayats WHERE id = $1"
 
         try:
             affected_rows = await execute_query(delete_query, args=(ayat_id,), fetch="exec")

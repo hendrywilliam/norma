@@ -3,7 +3,6 @@ Repository untuk Tabel Pasal
 CRUD operations untuk tabel pasal
 """
 
-import asyncpg
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
@@ -13,9 +12,15 @@ from db import get_db_connection, execute_query, validate_identifier, sanitize_s
 
 # Import Pasal models
 from models.pasal import (
-    PasalBase, PasalCreate, PasalUpdate, PasalInDB, PasalResponse,
-    PasalWithAyatCount, PasalWithBabPeraturan,
-    PasalListResponse, PasalFilter
+    PasalBase,
+    PasalCreate,
+    PasalUpdate,
+    PasalInDB,
+    PasalResponse,
+    PasalWithAyatCount,
+    PasalWithBabPeraturan,
+    PasalListResponse,
+    PasalFilter,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +29,7 @@ logger = logging.getLogger(__name__)
 # ========================================
 # Repository Class untuk Pasal
 # ========================================
+
 
 class PasalRepository:
     """Repository class untuk tabel pasal"""
@@ -58,15 +64,15 @@ class PasalRepository:
             pasal_id = await execute_query(
                 insert_query,
                 args=(
-                    pasal_data.get('peraturan_id'),
-                    pasal_data.get('bab_id'),
-                    pasal_data.get('nomor_pasal'),
-                    pasal_data.get('judul_pasal'),
-                    pasal_data.get('konten_pasal'),
-                    pasal_data.get('urutan'),
-                    pasal_data.get('metadata', {})
+                    pasal_data.get("peraturan_id"),
+                    pasal_data.get("bab_id"),
+                    pasal_data.get("nomor_pasal"),
+                    pasal_data.get("judul_pasal"),
+                    pasal_data.get("konten_pasal"),
+                    pasal_data.get("urutan"),
+                    pasal_data.get("metadata", {}),
                 ),
-                fetch="val"
+                fetch="val",
             )
             logger.info(f"Pasal created/updated: {pasal_id}")
             return pasal_id
@@ -95,11 +101,7 @@ class PasalRepository:
         return await execute_query(select_query, args=(pasal_id,), fetch="one")
 
     async def get_list(
-        self,
-        peraturan_id: str,
-        bab_id: Optional[int] = None,
-        skip: int = 0,
-        limit: int = 50
+        self, peraturan_id: str, bab_id: Optional[int] = None, skip: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
         """
         Get list pasal by peraturan_id atau bab_id dengan pagination
@@ -149,16 +151,11 @@ class PasalRepository:
                     "total": total,
                     "skip": skip,
                     "limit": limit,
-                    "items": [dict(item) for item in items]
+                    "items": [dict(item) for item in items],
                 }
         except Exception as e:
             logger.error(f"Failed to get pasal list: {e}")
-            return {
-                "total": 0,
-                "skip": skip,
-                "limit": limit,
-                "items": []
-            }
+            return {"total": 0, "skip": skip, "limit": limit, "items": []}
 
     async def update(self, pasal_id: int, update_data: Dict[str, Any]) -> bool:
         """
@@ -172,8 +169,14 @@ class PasalRepository:
             True jika berhasil, False jika tidak
         """
         # Build SET clause dengan prepared statements
-        allowed_fields = ['bab_id', 'nomor_pasal', 'judul_pasal',
-                         'konten_pasal', 'urutan', 'metadata']
+        allowed_fields = [
+            "bab_id",
+            "nomor_pasal",
+            "judul_pasal",
+            "konten_pasal",
+            "urutan",
+            "metadata",
+        ]
         set_clauses = []
         params = []
         param_count = 0
@@ -192,12 +195,14 @@ class PasalRepository:
 
         update_query = f"""
         UPDATE pasals
-        SET {', '.join(set_clauses)}
+        SET {", ".join(set_clauses)}
         WHERE id = ${param_count + 1}
         """
 
         try:
-            affected_rows = await execute_query(update_query, args=(*params, pasal_id), fetch="exec")
+            affected_rows = await execute_query(
+                update_query, args=(*params, pasal_id), fetch="exec"
+            )
             logger.info(f"Updated pasal {pasal_id}: {affected_rows} rows")
             return affected_rows > 0
         except Exception as e:
@@ -225,11 +230,7 @@ class PasalRepository:
             return False
 
     async def search(
-        self,
-        query: str,
-        peraturan_id: str,
-        skip: int = 0,
-        limit: int = 50
+        self, query: str, peraturan_id: str, skip: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
         """
         Search pasal dalam peraturan spesifik menggunakan full-text search
@@ -288,16 +289,11 @@ class PasalRepository:
                     "total": total,
                     "skip": skip,
                     "limit": limit,
-                    "items": [dict(item) for item in items]
+                    "items": [dict(item) for item in items],
                 }
         except Exception as e:
             logger.error(f"Failed to search pasal: {e}")
-            return {
-                "total": 0,
-                "skip": skip,
-                "limit": limit,
-                "items": []
-            }
+            return {"total": 0, "skip": skip, "limit": limit, "items": []}
 
 
 # Singleton repository instance

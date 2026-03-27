@@ -21,7 +21,7 @@ async def init_db_pool(
     user: str = "postgres",
     password: str = "postgres",
     min_connections: int = 1,
-    max_connections: int = 10
+    max_connections: int = 10,
 ) -> None:
     """
     Inisialisasi database connection pool
@@ -47,7 +47,7 @@ async def init_db_pool(
             min_size=min_connections,
             max_size=max_connections,
             command_timeout=60,
-            setup="SET timezone='UTC'"
+            server_settings={"timezone": "UTC"},
         )
         logger.info(
             f"Database pool initialized: {host}:{port}/{database} "
@@ -80,9 +80,7 @@ async def get_db_connection():
     global _db_pool
 
     if _db_pool is None:
-        raise RuntimeError(
-            "Database pool not initialized. Call init_db_pool() first."
-        )
+        raise RuntimeError("Database pool not initialized. Call init_db_pool() first.")
 
     async with _db_pool.acquire() as conn:
         try:
@@ -130,16 +128,10 @@ def get_pool_status() -> dict:
         "min_size": _db_pool.get_min_size(),
         "max_size": _db_pool.get_max_size(),
         "size": _db_pool.get_size(),
-        "max_queries": _db_pool.get_max_queries(),
-        "max_inactive": _db_pool.get_max_inactive_connection_lifetime(),
     }
 
 
-async def execute_query(
-    query: str,
-    args: tuple = (),
-    fetch: str = "one"
-) -> Optional[Any]:
+async def execute_query(query: str, args: tuple = (), fetch: str = "one") -> Optional[Any]:
     """
     Execute query dengan parameterized statement (prepared statement)
 
@@ -177,9 +169,7 @@ async def execute_query(
             raise
 
 
-async def execute_transaction(
-    queries: list[tuple[str, tuple]]
-) -> list[Any]:
+async def execute_transaction(queries: list[tuple[str, tuple]]) -> list[Any]:
     """
     Execute multiple queries dalam satu transaksi
 
@@ -210,6 +200,7 @@ async def execute_transaction(
 # Helper functions untuk escaping parameter jika diperlukan
 # Namun, asyncpg sudah melakukan escaping otomatis untuk positional parameters
 
+
 def validate_identifier(identifier: str) -> bool:
     """
     Validasi bahwa identifier hanya berisi karakter aman untuk SQL identifier
@@ -225,8 +216,9 @@ def validate_identifier(identifier: str) -> bool:
         Untuk values, gunakan positional parameters ($1, $2, dll.)
     """
     import re
+
     # Hanya izinkan alphanumeric, underscore, dan dot
-    pattern = r'^[a-zA-Z0-9_\.]+$'
+    pattern = r"^[a-zA-Z0-9_\.]+$"
     return bool(re.match(pattern, identifier))
 
 
