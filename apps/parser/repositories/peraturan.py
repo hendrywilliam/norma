@@ -292,7 +292,6 @@ class PeraturanRepository:
             return False
 
         set_clauses.append("updated_at = CURRENT_TIMESTAMP")
-        params.append(peraturan_id)
 
         update_query = f"""
         UPDATE peraturan

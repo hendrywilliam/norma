@@ -268,3 +268,4 @@ def get_peraturan(peraturan_id: str):
 - Semua SQL queries harus menggunakan positional parameters ($1, $2, dst) untuk mencegah SQL injection
 - Return type dari `execute_query` dengan `fetch="exec"` adalah `int` (affected rows)
 - Return type dari `execute_query` dengan `fetch="val"` bisa `None` jika tidak ada hasil
+- Use english ketika ingin menambahkan comment.

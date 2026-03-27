@@ -154,11 +154,14 @@ def finish_parsing(
         logger.error(f"Parsing job failed: {error}")
 
 
-def update_progress(current: int, total: int, task: Optional[str] = None) -> None:
+def update_progress(
+    job_id: Optional[str] = None, current: int = 0, total: int = 0, task: Optional[str] = None
+) -> None:
     """
     Update progress parsing
 
     Args:
+        job_id: ID dari parsing job
         current: Jumlah item yang sudah diparse
         total: Total item yang akan diparse
         task: Task yang sedang dijalankan
@@ -166,10 +169,14 @@ def update_progress(current: int, total: int, task: Optional[str] = None) -> Non
     progress = int((current / total) * 100) if total > 0 else 0
 
     update_parse_status(
-        progress=progress, processed_items=current, total_items=total, current_task=task
+        job_id=job_id,
+        progress=progress,
+        processed_items=current,
+        total_items=total,
+        current_task=task,
     )
 
-    logger.debug(f"Progress: {progress}% ({current}/{total}) - {task}")
+    logger.debug(f"[{job_id}] Progress: {progress}% ({current}/{total}) - {task}")
 
 
 def increment_success_count() -> None:
