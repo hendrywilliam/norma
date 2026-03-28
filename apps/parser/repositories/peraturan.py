@@ -273,7 +273,7 @@ class PeraturanRepository:
             "tanggal_diundangkan",
             "tanggal_disahkan",
             "deskripsi",
-            "metadata",
+            # "metadata",
             "parsed_at",
             "reparse_count",
             "last_reparse_at",
