@@ -3,19 +3,27 @@ PDF Parser untuk mengekstrak struktur peraturan (bab, pasal, ayat) dari PDF
 """
 
 import pdfplumber
+import fitz
+from PIL import Image
 from typing import Dict, List, Optional, Any, Tuple, Union
 import logging
 from io import BytesIO
 import re
 import asyncio
 import aiohttp
+import json
+import base64
+import tempfile
+import os
+from pathlib import Path
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 async def download_pdf(url: str, session: Optional[aiohttp.ClientSession] = None) -> bytes:
     """
-    Download PDF dari URL dan return sebagai bytes
+    Download PDF dari URL danreturn sebagai bytes
 
     Args:
         url: URL PDF
@@ -43,13 +51,160 @@ async def download_pdf(url: str, session: Optional[aiohttp.ClientSession] = None
             await session.close()
 
 
-async def parse_pdf(pdf_source: Union[str, bytes, Any], extract_images: bool = False) -> Dict:
+def pdf_pages_to_images(
+    pdf_source: Union[str, bytes, Any],
+    output_dir: Optional[str] = None,
+    scale: float = 2.0,
+    image_format: str = "png",
+) -> Dict[str, Any]:
+    """
+    Convert PDF pages to images using PyMuPDF (fitz)
+
+    Args:
+        pdf_source: PDF file path, bytes, or file-like object
+        output_dir: Directory to save images (default: temp directory)
+        scale: Scale factor for image quality (default: 2.0 for better quality)
+        image_format: Image format (png, jpeg, etc.)
+
+    Returns:
+        Dictionary containing:
+        - output_dir: Path to directory containing images
+        - images: List of image info dicts with page, path, width, height
+        - total_pages: Total number of pages converted
+    """
+    if output_dir is None:
+        output_dir = tempfile.mkdtemp(prefix="pdf_pages_")
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    images_info = []
+
+    try:
+        if isinstance(pdf_source, bytes):
+            doc = fitz.open(stream=pdf_source, filetype="pdf")
+        elif isinstance(pdf_source, str) and os.path.exists(pdf_source):
+            doc = fitz.open(pdf_source)
+        else:
+            doc = fitz.open(stream=pdf_source.read(), filetype="pdf")
+
+        total_pages = len(doc)
+        logger.info(f"Converting {total_pages} PDF pages to images in {output_dir}")
+
+        for page_num in range(total_pages):
+            page = doc[page_num]
+            mat = fitz.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=mat)
+
+            filename = f"page_{page_num + 1:04d}.{image_format}"
+            filepath = os.path.join(output_dir, filename)
+
+            pix.save(filepath)
+
+            images_info.append(
+                {
+                    "page": page_num + 1,
+                    "path": filepath,
+                    "filename": filename,
+                    "width": pix.width,
+                    "height": pix.height,
+                    "format": image_format,
+                }
+            )
+
+            logger.debug(f"Saved page {page_num + 1} to {filepath}")
+
+        doc.close()
+
+        logger.info(f"Successfully converted {total_pages} pages to {output_dir}")
+
+        return {
+            "output_dir": output_dir,
+            "images": images_info,
+            "total_pages": total_pages,
+        }
+
+    except Exception as e:
+        logger.error(f"Error converting PDF to images: {e}")
+        raise
+
+
+def pdf_pages_to_base64(
+    pdf_source: Union[str, bytes, Any], scale: float = 2.0, image_format: str = "png"
+) -> List[Dict[str, Any]]:
+    """
+    Convert PDF pages to base64 encoded images (in-memory)
+
+    Args:
+        pdf_source: PDF file path, bytes, or file-like object
+        scale: Scale factor for image quality (default: 2.0)
+        image_format: Image format (png, jpeg, etc.)
+
+    Returns:
+        List of dictionaries containing:
+        - page: Page number (1-indexed)
+        - image_b64: Base64 encoded image
+        - width: Image width
+        - height: Image height
+    """
+    pages = []
+
+    try:
+        if isinstance(pdf_source, bytes):
+            doc = fitz.open(stream=pdf_source, filetype="pdf")
+        elif isinstance(pdf_source, str) and os.path.exists(pdf_source):
+            doc = fitz.open(pdf_source)
+        else:
+            doc = fitz.open(stream=pdf_source.read(), filetype="pdf")
+
+        total_pages = len(doc)
+        logger.info(f"Converting {total_pages} PDF pages to base64 images")
+
+        for page_num in range(total_pages):
+            page = doc[page_num]
+            mat = fitz.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=mat)
+
+            img_bytes = pix.tobytes(image_format)
+            img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+
+            pages.append(
+                {
+                    "page": page_num + 1,
+                    "image_b64": img_b64,
+                    "width": pix.width,
+                    "height": pix.height,
+                    "format": image_format,
+                }
+            )
+
+            logger.debug(f"Converted page {page_num + 1} to base64")
+
+        doc.close()
+
+        logger.info(f"Successfully converted {total_pages} pages to base64")
+        return pages
+
+    except Exception as e:
+        logger.error(f"Error converting PDF to base64: {e}")
+        raise
+
+
+async def parse_pdf(
+    pdf_source: Union[str, bytes, Any],
+    extract_images: bool = False,
+    convert_to_images: bool = False,
+    image_output_dir: Optional[str] = None,
+    image_scale: float = 2.0,
+) -> Dict:
     """
     Parse PDF dan extract konten, metadata, dan struktur peraturan
 
     Args:
-        pdf_source: PDF file path, URL, bytes, atau file-like object
-        extract_images: Apakah extract images (default False)
+        pdf_source: PDF file path, URL, bytes, or file-like object
+        extract_images: Apakah extract images (default False) - for tables
+        convert_to_images: Apakah convert PDF pages to images (default False)
+        image_output_dir: Directory for images (default: temp directory)
+        image_scale: Scale factor for image quality (default: 2.0)
 
     Returns:
         Dictionary berisi:
@@ -58,6 +213,8 @@ async def parse_pdf(pdf_source: Union[str, bytes, Any], extract_images: bool = F
         - metadata: Metadata PDF
         - structure: Struktur peraturan (bab, pasal, ayat)
         - tables: List tables jika ada (opsional)
+        - images: List image info jika convert_to_images=True
+        - image_dir: Path to image directory jika convert_to_images=True
     """
     # Jika pdf_source adalah URL (string yang dimulai dengan http), download dulu
     if isinstance(pdf_source, str) and (
@@ -68,11 +225,25 @@ async def parse_pdf(pdf_source: Union[str, bytes, Any], extract_images: bool = F
         pdf_source = BytesIO(pdf_bytes)
 
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, _parse_pdf_sync, pdf_source, extract_images)
+    result = await loop.run_in_executor(
+        None,
+        _parse_pdf_sync,
+        pdf_source,
+        extract_images,
+        convert_to_images,
+        image_output_dir,
+        image_scale,
+    )
     return result
 
 
-def _parse_pdf_sync(pdf_source: Any, extract_images: bool) -> Dict:
+def _parse_pdf_sync(
+    pdf_source: Any,
+    extract_images: bool,
+    convert_to_images: bool,
+    image_output_dir: Optional[str],
+    image_scale: float,
+) -> Dict:
     """
     Synchronous PDF parsing function - run in executor
     """
@@ -83,13 +254,53 @@ def _parse_pdf_sync(pdf_source: Any, extract_images: bool) -> Dict:
         "structure": {"bab": [], "pasal": [], "ayat": []},
         "tables": [],
         "page_count": 0,
+        "images": [],
+        "image_dir": None,
     }
 
     try:
-        with pdfplumber.open(pdf_source) as pdf:
+        # Convert PDF to images jika diminta
+        if convert_to_images:
+            logger.info("Converting PDF pages to images...")
+
+            # Handle different input types
+            if isinstance(pdf_source, bytes):
+                pdf_bytes_input = pdf_source
+            elif isinstance(pdf_source, str) and os.path.exists(pdf_source):
+                with open(pdf_source, "rb") as f:
+                    pdf_bytes_input = f.read()
+            else:
+                pdf_bytes_input = pdf_source.read()
+
+            image_result = pdf_pages_to_images(
+                pdf_bytes_input,
+                output_dir=image_output_dir,
+                scale=image_scale,
+            )
+
+            result["images"] = image_result["images"]
+            result["image_dir"] = image_result["output_dir"]
+            result["page_count"] = image_result["total_pages"]
+
+            logger.info(
+                f"Converted {len(result['images'])} pages to images in {result['image_dir']}"
+            )
+
+        # Parse PDF untuk text extraction
+        pdf_input = pdf_source
+        if convert_to_images and isinstance(pdf_source, bytes):
+            # Jika sudah di-convert, gunakan bytes yang sama untuk text extraction
+            pdf_input = BytesIO(pdf_source)
+        elif convert_to_images and hasattr(pdf_source, "read"):
+            # Reset stream jika sudah di-read
+            pdf_source.seek(0)
+            pdf_input = pdf_source
+
+        with pdfplumber.open(pdf_input) as pdf:
             # Extract metadata
             result["metadata"] = extract_metadata(pdf)
-            result["page_count"] = len(pdf.pages)
+            if not convert_to_images:
+                result["page_count"] = len(pdf.pages)
 
             # Extract text per halaman
             full_text = []
@@ -480,7 +691,12 @@ def extract_keywords(text: str, min_freq: int = 2) -> List[str]:
 
 
 async def parse_peraturan_complete(
-    pdf_source: Any, peraturan_id: str, extract_images: bool = False
+    pdf_source: Any,
+    peraturan_id: str,
+    extract_images: bool = False,
+    convert_to_images: bool = False,
+    image_output_dir: Optional[str] = None,
+    image_scale: float = 2.0,
 ) -> Dict[str, Any]:
     """
     Parse PDF peraturan secara lengkap dengan struktur database-ready
@@ -488,7 +704,10 @@ async def parse_peraturan_complete(
     Args:
         pdf_source: PDF file path, bytes, atau file-like object
         peraturan_id: ID peraturan dari database
-        extract_images: Apakah extract images
+        extract_images: Apakah extract images/tables
+        convert_to_images: Apakah convert PDF pages to images
+        image_output_dir: Directory for images (default: temp directory)
+        image_scale: Scale factor for image quality (default: 2.0)
 
     Returns:
         Dictionary berisi data yang sudah siap untuk disimpan ke database
@@ -496,8 +715,16 @@ async def parse_peraturan_complete(
     try:
         logger.info(f"Starting complete parsing for peraturan {peraturan_id}")
 
-        # Parse PDF dasar
-        parse_result = await parse_pdf(pdf_source, extract_images)
+        # Parse PDF dengan semua opsi
+        parse_result = await parse_pdf(
+            pdf_source,
+            extract_images=extract_images,
+            convert_to_images=convert_to_images,
+            image_output_dir=image_output_dir,
+            image_scale=image_scale,
+        )
+
+        logger.info(json.dumps(parse_result, default=str))
 
         # Extract struktur peraturan
         structure = parse_result["structure"]
@@ -533,6 +760,13 @@ async def parse_peraturan_complete(
                 "ayat_count": len(content_structure["ayat"]),
             },
         }
+
+        # Tambahkan image info jika ada
+        if convert_to_images and parse_result.get("images"):
+            result["images"] = parse_result["images"]
+            result["image_dir"] = parse_result.get("image_dir")
+
+        logger.info(result)
 
         logger.info(f"Complete parsing finished: {result['parse_stats']}")
         return result
