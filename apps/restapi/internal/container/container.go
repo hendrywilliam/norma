@@ -11,82 +11,109 @@ import (
 	"github.com/hendrywilliam/norma/apps/restapi/pkg/database"
 )
 
-// DI Container keys
-const (
-	ConfigKey           = "config"
-	DBKey               = "db"
-	PeraturanRepoKey    = "peraturan-repo"
-	PeraturanServiceKey = "peraturan-service"
-	PeraturanHandlerKey = "peraturan-handler"
-)
+// Build creates and configures all dependencies
+func Build() *do.RootScope {
+	scope := do.New()
 
-func NewContainer() *do.RootScope {
-	scope := do.NewRootScope()
+	// Config
+	do.ProvideValue(scope, config.Load())
 
-	// Register providers
-	do.Provide(scope, provideConfig)
-	do.Provide(scope, provideDB)
-	do.Provide(scope, providePeraturanRepository)
-	do.Provide(scope, providePeraturanService)
-	do.Provide(scope, providePeraturanHandler)
+	// Database
+	do.Provide(scope, NewDB)
+
+	// Repositories
+	do.Provide(scope, NewPeraturanRepository)
+	do.Provide(scope, NewBabRepository)
+	do.Provide(scope, NewPasalRepository)
+	do.Provide(scope, NewAyatRepository)
+
+	// Services
+	do.Provide(scope, NewPeraturanService)
+	do.Provide(scope, NewBabService)
+	do.Provide(scope, NewPasalService)
+	do.Provide(scope, NewAyatService)
+
+	// Handlers
+	do.Provide(scope, NewPeraturanHandler)
+	do.Provide(scope, NewBabHandler)
+	do.Provide(scope, NewPasalHandler)
+	do.Provide(scope, NewAyatHandler)
 
 	return scope
 }
 
-func provideConfig(scope *do.RootScope) (*config.Config, error) {
-	return do.NamedSingleton(scope, ConfigKey, func() (*config.Config, error) {
-		return config.Load(), nil
+// Database
+func NewDB(i do.Injector) (database.DB, error) {
+	cfg := do.MustInvoke[*config.Config](i)
+	return database.NewConnection(database.DBConfig{
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password,
+		Name:     cfg.Database.Name,
+		SSLMode:  cfg.Database.SSLMode,
 	})
 }
 
-func provideDB(scope *do.RootScope, cfg *config.Config) (database.DB, error) {
-	return do.NamedSingleton(scope, DBKey, func() (database.DB, error) {
-		return database.NewConnection(database.DBConfig{
-			Host:     cfg.Database.Host,
-			Port:     cfg.Database.Port,
-			User:     cfg.Database.User,
-			Password: cfg.Database.Password,
-			Name:     cfg.Database.Name,
-			SSLMode:  cfg.Database.SSLMode,
-		})
-	})
+// Repositories
+func NewPeraturanRepository(i do.Injector) (repository.PeraturanRepository, error) {
+	db := do.MustInvoke[database.DB](i)
+	return postgresrepo.NewPeraturanRepository(db), nil
 }
 
-func providePeraturanRepository(scope *do.RootScope, db database.DB) (repository.PeraturanRepository, error) {
-	return do.NamedSingleton(scope, PeraturanRepoKey, func() (repository.PeraturanRepository, error) {
-		return postgresrepo.NewPeraturanRepository(db), nil
-	})
+func NewBabRepository(i do.Injector) (repository.BabRepository, error) {
+	db := do.MustInvoke[database.DB](i)
+	return postgresrepo.NewBabRepository(db), nil
 }
 
-func providePeraturanService(scope *do.RootScope, repo repository.PeraturanRepository) (service.PeraturanService, error) {
-	return do.NamedSingleton(scope, PeraturanServiceKey, func() (service.PeraturanService, error) {
-		return service.NewPeraturanService(repo), nil
-	})
+func NewPasalRepository(i do.Injector) (repository.PasalRepository, error) {
+	db := do.MustInvoke[database.DB](i)
+	return postgresrepo.NewPasalRepository(db), nil
 }
 
-func providePeraturanHandler(scope *do.RootScope, svc service.PeraturanService) (*handler.PeraturanHandler, error) {
-	return do.NamedSingleton(scope, PeraturanHandlerKey, func() (*handler.PeraturanHandler, error) {
-		return handler.NewPeraturanHandler(svc), nil
-	})
+func NewAyatRepository(i do.Injector) (repository.AyatRepository, error) {
+	db := do.MustInvoke[database.DB](i)
+	return postgresrepo.NewAyatRepository(db), nil
 }
 
-// Getters for retrieving dependencies
-func GetConfig(scope *do.RootScope) *config.Config {
-	return do.MustInvoke[*config.Config](scope, provideConfig)
+// Services
+func NewPeraturanService(i do.Injector) (service.PeraturanService, error) {
+	repo := do.MustInvoke[repository.PeraturanRepository](i)
+	return service.NewPeraturanService(repo), nil
 }
 
-func GetDB(scope *do.RootScope) database.DB {
-	return do.MustInvoke[database.DB](scope, provideDB)
+func NewBabService(i do.Injector) (service.BabService, error) {
+	repo := do.MustInvoke[repository.BabRepository](i)
+	return service.NewBabService(repo), nil
 }
 
-func GetPeraturanRepository(scope *do.RootScope) repository.PeraturanRepository {
-	return do.MustInvoke[repository.PeraturanRepository](scope, providePeraturanRepository)
+func NewPasalService(i do.Injector) (service.PasalService, error) {
+	repo := do.MustInvoke[repository.PasalRepository](i)
+	return service.NewPasalService(repo), nil
 }
 
-func GetPeraturanService(scope *do.RootScope) service.PeraturanService {
-	return do.MustInvoke[service.PeraturanService](scope, providePeraturanService)
+func NewAyatService(i do.Injector) (service.AyatService, error) {
+	repo := do.MustInvoke[repository.AyatRepository](i)
+	return service.NewAyatService(repo), nil
 }
 
-func GetPeraturanHandler(scope *do.RootScope) *handler.PeraturanHandler {
-	return do.MustInvoke[*handler.PeraturanHandler](scope, providePeraturanHandler)
+// Handlers
+func NewPeraturanHandler(i do.Injector) (*handler.PeraturanHandler, error) {
+	svc := do.MustInvoke[service.PeraturanService](i)
+	return handler.NewPeraturanHandler(svc), nil
+}
+
+func NewBabHandler(i do.Injector) (*handler.BabHandler, error) {
+	svc := do.MustInvoke[service.BabService](i)
+	return handler.NewBabHandler(svc), nil
+}
+
+func NewPasalHandler(i do.Injector) (*handler.PasalHandler, error) {
+	svc := do.MustInvoke[service.PasalService](i)
+	return handler.NewPasalHandler(svc), nil
+}
+
+func NewAyatHandler(i do.Injector) (*handler.AyatHandler, error) {
+	svc := do.MustInvoke[service.AyatService](i)
+	return handler.NewAyatHandler(svc), nil
 }

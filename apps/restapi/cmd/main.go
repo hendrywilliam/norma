@@ -11,17 +11,20 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/samber/do/v2"
 
+	"github.com/hendrywilliam/norma/apps/restapi/internal/config"
 	"github.com/hendrywilliam/norma/apps/restapi/internal/container"
+	"github.com/hendrywilliam/norma/apps/restapi/internal/handler"
 )
 
 func main() {
 	// Initialize DI Container
-	scope := container.NewContainer()
+	scope := container.Build()
 	defer scope.Shutdown()
 
 	// Get config
-	cfg := container.GetConfig(scope)
+	cfg := do.MustInvoke[*config.Config](scope)
 
 	// Set Gin mode
 	gin.SetMode(cfg.Server.Mode)
@@ -43,8 +46,17 @@ func main() {
 	api := router.Group("/api/v1")
 	{
 		// Register handlers
-		peraturanHandler := container.GetPeraturanHandler(scope)
+		peraturanHandler := do.MustInvoke[*handler.PeraturanHandler](scope)
 		peraturanHandler.RegisterRoutes(api)
+
+		babHandler := do.MustInvoke[*handler.BabHandler](scope)
+		babHandler.RegisterRoutes(api)
+
+		pasalHandler := do.MustInvoke[*handler.PasalHandler](scope)
+		pasalHandler.RegisterRoutes(api)
+
+		ayatHandler := do.MustInvoke[*handler.AyatHandler](scope)
+		ayatHandler.RegisterRoutes(api)
 	}
 
 	// Root endpoint
@@ -56,7 +68,9 @@ func main() {
 			"docs":    "/health",
 			"endpoints": gin.H{
 				"peraturan": "/api/v1/peraturan",
-				"search":    "/api/v1/peraturan/search",
+				"bab":       "/api/v1/peraturan/:id/bab",
+				"pasal":     "/api/v1/peraturan/:id/pasal",
+				"ayat":      "/api/v1/peraturan/:id/pasal/:pasal_id/ayat",
 			},
 		})
 	})
