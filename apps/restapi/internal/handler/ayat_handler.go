@@ -68,7 +68,8 @@ func (h *AyatHandler) GetList(c *gin.Context) {
 }
 
 func (h *AyatHandler) RegisterRoutes(r *gin.RouterGroup) {
-	ayat := r.Group("/peraturan/:peraturan_id/pasal/:pasal_id/ayat")
+	// Use :id for peraturan, :pasal_id for pasal to match the routes
+	ayat := r.Group("/peraturan/:id/pasal/:pasal_id/ayat")
 	{
 		ayat.GET("", h.GetList)
 		ayat.GET("/:id", h.GetByID)

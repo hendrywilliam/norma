@@ -6,31 +6,40 @@ REST API untuk mengelola data peraturan dengan arsitektur Clean Architecture men
 
 ```
 apps/restapi/
-├── cmd/
-│   └── main.go                 # Entry point
+├── cmd/main.go                              # Entry point
 ├── internal/
-│   ├── config/
-│   │   └── config.go           # Configuration loader
-│   ├── container/
-│   │   └── container.go        # DI Container (samber/do)
+│   ├── config/config.go                    # Configuration loader (godotenv)
+│   ├── container/container.go              # DI Container (samber/do v2)
 │   ├── domain/
 │   │   ├── model/
-│   │   │   └── peraturan.go    # Domain models
+│   │   │   ├── peraturan.go               # Peraturan model
+│   │   │   ├── bab.go                     # Bab model
+│   │   │   ├── pasal.go                   # Pasal model
+│   │   │   └── ayat.go                    # Ayat model
 │   │   ├── repository/
-│   │   │   └── repository.go   # Repository interfaces
+│   │   │   ├── peraturan_repository.go    # Repository interface
+│   │   │   ├── bab_repository.go          # Repository interface
+│   │   │   ├── pasal_repository.go        # Repository interface
+│   │   │   └── ayat_repository.go         # Repository interface
 │   │   └── service/
-│   │       └── peraturan_service.go  # Business logic
+│   │       ├── peraturan_service.go       # Business logic
+│   │       ├── bab_service.go             # Business logic
+│   │       ├── pasal_service.go           # Business logic
+│   │       └── ayat_service.go            # Business logic
 │   ├── handler/
-│   │   └── peraturan_handler.go # HTTP handlers
-│   └── infrastructure/
-│       └── repository/
-│           └── postgres/
-│               └── peraturan_repository.go # Repository implementation
+│   │   ├── peraturan_handler.go           # HTTP handlers
+│   │   ├── bab_handler.go                 # HTTP handlers
+│   │   ├── pasal_handler.go               # HTTP handlers
+│   │   └── ayat_handler.go                # HTTP handlers
+│   └── infrastructure/repository/postgres/
+│       ├── peraturan_repository.go        # Repository implementation
+│       ├── bab_repository.go              # Repository implementation
+│       ├── pasal_repository.go            # Repository implementation
+│       └── ayat_repository.go             # Repository implementation
 ├── pkg/
-│   ├── database/
-│   │   └── database.go         # Database connection
-│   └── response/
-│       └── response.go         # HTTP response helpers
+│   ├── database/database.go               # Database connection (pgxpool)
+│   └── response/response.go               # HTTP response helpers
+├── .env.example                           # Environment variables template
 ├── go.mod
 └── README.md
 ```
@@ -51,22 +60,34 @@ apps/restapi/
 - Request/Response transformation
 
 ### 4. **Container Layer** (internal/container/)
-- DI Container using samber/do
+- DI Container using samber/do v2
 - Dependency injection wiring
 
-## Dependency Injection (samber/do)
+## Dependency Injection (samber/do v2)
 
 ```go
-// Container initialization
-scope := container.NewContainer()
+// container.go - Define providers
+func Build() *do.RootScope {
+    scope := do.New()
+    do.ProvideValue(scope, config.Load())
+    do.Provide(scope, NewDB)
+    do.Provide(scope, NewPeraturanRepository)
+    do.Provide(scope, NewPeraturanService)
+    do.Provide(scope, NewPeraturanHandler)
+    return scope
+}
+
+func NewPeraturanService(i do.Injector) (service.PeraturanService, error) {
+    repo := do.MustInvoke[repository.PeraturanRepository](i)
+    return service.NewPeraturanService(repo), nil
+}
+
+// main.go - Usage
+scope := container.Build()
 defer scope.Shutdown()
 
-// Get dependencies
-cfg := container.GetConfig(scope)
-db := container.GetDB(scope)
-repo := container.GetPeraturanRepository(scope)
-service := container.GetPeraturanService(scope)
-handler := container.GetPeraturanHandler(scope)
+cfg := do.MustInvoke[*config.Config](scope)
+handler := do.MustInvoke[*handler.PeraturanHandler](scope)
 ```
 
 ## API Endpoints
@@ -80,8 +101,20 @@ handler := container.GetPeraturanHandler(scope)
 | PUT | /api/v1/peraturan/:id | Update peraturan |
 | DELETE | /api/v1/peraturan/:id | Delete peraturan |
 | GET | /api/v1/peraturan/search?q=query | Search peraturan |
+| GET | /api/v1/peraturan/:id/bab | List bab |
+| GET | /api/v1/peraturan/:id/bab/:bab_id | Get bab by ID |
+| GET | /api/v1/peraturan/:id/pasal | List pasal |
+| GET | /api/v1/peraturan/:id/pasal/:pasal_id | Get pasal by ID |
+| GET | /api/v1/peraturan/:id/pasal/:pasal_id/ayat | List ayat |
+| GET | /api/v1/peraturan/:id/pasal/:pasal_id/ayat/:ayat_id | Get ayat by ID |
 
 ## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 # Server
@@ -106,6 +139,9 @@ cd apps/restapi
 # Install dependencies
 go mod tidy
 
+# Copy environment file
+cp .env.example .env
+
 # Run
 go run cmd/main.go
 
@@ -117,6 +153,7 @@ go build -o bin/app cmd/main.go
 
 - **Language**: Go 1.22+
 - **Framework**: Gin
-- **Database**: PostgreSQL (pgx)
+- **Database**: PostgreSQL (pgx/v5)
 - **DI Container**: samber/do v2
+- **Env Loader**: godotenv
 - **Architecture**: Clean Architecture / Hexagonal

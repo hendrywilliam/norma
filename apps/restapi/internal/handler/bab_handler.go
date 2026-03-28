@@ -39,7 +39,7 @@ func (h *BabHandler) GetByID(c *gin.Context) {
 }
 
 func (h *BabHandler) GetList(c *gin.Context) {
-	peraturanID := c.Param("peraturan_id")
+	peraturanID := c.Param("id") // Use :id to match peraturan routes
 	skip, _ := strconv.Atoi(c.DefaultQuery("skip", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 
@@ -63,7 +63,7 @@ func (h *BabHandler) GetList(c *gin.Context) {
 }
 
 func (h *BabHandler) RegisterRoutes(r *gin.RouterGroup) {
-	bab := r.Group("/peraturan/:peraturan_id/bab")
+	bab := r.Group("/peraturan/:id/bab")
 	{
 		bab.GET("", h.GetList)
 		bab.GET("/:id", h.GetByID)

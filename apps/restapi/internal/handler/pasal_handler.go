@@ -39,7 +39,7 @@ func (h *PasalHandler) GetByID(c *gin.Context) {
 }
 
 func (h *PasalHandler) GetList(c *gin.Context) {
-	peraturanID := c.Param("peraturan_id")
+	peraturanID := c.Param("id") // Use :id to match peraturan routes
 	skip, _ := strconv.Atoi(c.DefaultQuery("skip", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 
@@ -63,9 +63,9 @@ func (h *PasalHandler) GetList(c *gin.Context) {
 }
 
 func (h *PasalHandler) RegisterRoutes(r *gin.RouterGroup) {
-	pasal := r.Group("/peraturan/:peraturan_id/pasal")
+	pasal := r.Group("/peraturan/:id/pasal")
 	{
 		pasal.GET("", h.GetList)
-		pasal.GET("/:id", h.GetByID)
+		pasal.GET("/:pasal_id", h.GetByID)
 	}
 }
