@@ -1,222 +1,233 @@
-# Platform Peraturan Database & Chatbot
+# Norma - Indonesian Legal Documents Database & Chatbot
 
-Platform untuk mengelola dan menelusuri database peraturan dari peraturan.go.id dengan fitur chatbot berbasis AI.
+Platform for managing and querying Indonesian legal documents (peraturan) from peraturan.go.id.
 
-## Struktur Project
+## Project Structure
 
 ```
 norma/
 ├── apps/
-│   ├── parser/                    # HTTP Server untuk parsing PDF
-│   │   ├── api/                   # API routes
-│   │   ├── db/                    # Database operations
-│   │   ├── models/                # Pydantic data models
-│   │   ├── parser/                # Core parsing logic
-│   │   │   ├── scraper.py         # Scraper peraturan.go.id
-│   │   │   ├── pdf_parser.py      # PDF parser
-│   │   │   └── status.py          # Status management
+│   ├── parser/                    # PDF Parser Service (Python/FastAPI)
+│   │   ├── api/                    # API routes
+│   │   ├── db/                     # Database operations
+│   │   ├── models/                 # Pydantic data models
+│   │   ├── parser/                 # Core parsing logic
+│   │   │   ├── scraper.py          # peraturan.go.id scraper
+│   │   │   ├── pdf_parser.py       # PDF parser
+│   │   │   └── status.py           # Parsing status management
+│   │   ├── repositories/           # Database repositories
+│   │   ├── migrations/             # SQL migration files
 │   │   ├── main.py                # FastAPI entry point
-│   │   ├── pyproject.toml         # UV configuration
-│   │   ├── Dockerfile             # Docker container
-│   │   └── README.md              # Parser documentation
-│   └── web/                       # Frontend (coming soon)
+│   │   ├── pyproject.toml         # UV package configuration
+│   │   └── Dockerfile             # Docker container
+│   │
+│   ├── restapi/                   # REST API Service (Go/Gin)
+│   │   ├── cmd/main.go            # Entry point
+│   │   ├── internal/
+│   │   │   ├── config/            # Configuration loader
+│   │   │   ├── container/         # DI Container (samber/do)
+│   │   │   ├── domain/            # Domain layer
+│   │   │   │   ├── model/        # Entity models
+│   │   │   │   ├── repository/   # Repository interfaces
+│   │   │   │   └── service/      # Business logic
+│   │   │   ├── handler/          # HTTP handlers
+│   │   │   └── infrastructure/   # Infrastructure layer
+│   │   │       └── repository/   # Repository implementations
+│   │   ├── pkg/
+│   │   │   ├── database/         # Database connection
+│   │   │   └── response/        # HTTP response helpers
+│   │   ├── go.mod
+│   │   └── README.md
+│   │
+│   └── web/                       # Frontend (Planned)
+│
 ├── docker/
 │   └── postgres/
-│       └── init.sql               # Database init script
-├── docker-compose.yml             # Docker services
-└── README.md                      # This file
+│       └── init.sql              # Database init script
+│
+├── docker-compose.yml            # Docker services
+└── README.md                     # This file
 ```
 
-## Fitur Utama
+## Features
 
-- **Parser**: HTTP Server untuk scrape dan parse PDF dari peraturan.go.id
-- **Database**: PostgreSQL dengan full-text search untuk menyimpan data peraturan
-- **API**: REST API untuk trigger parsing, cek status, dan query peraturan
-- **Chatbot**: Tanya jawab tentang peraturan menggunakan AI (coming soon)
-- **Search**: Cari peraturan berdasarkan kategori, tahun, atau keyword dengan full-text search
+- **Parser Service**: Scrape and parse PDF documents from peraturan.go.id
+- **REST API**: Manage legal documents with Clean Architecture (Go)
+- **Database**: PostgreSQL with full-text search support
+- **Chatbot**: AI-powered Q&A about legal documents (Planned)
 
 ## Tech Stack
 
-### Parser
-- **Language**: Python 3.11+
+### Parser Service (Python)
+- **Language**: Python 3.10+
 - **Framework**: FastAPI
 - **Package Manager**: UV
-- **PDF Parsing**: pdfplumber
-- **Web Scraping**: BeautifulSoup4 + Requests
-- **Database**: PostgreSQL + psycopg2
-- **Docker**: Docker + Docker Compose
+- **PDF Parsing**: pdfplumber, PyMuPDF
+- **Web Scraping**: aiohttp + BeautifulSoup4
+- **Database**: PostgreSQL (asyncpg)
 
-### Frontend (Coming Soon)
-- **Framework**: React/Next.js
-- **UI Library**: TBD
-- **Chatbot**: OpenAI API / LangChain
+### REST API Service (Go)
+- **Language**: Go 1.23+
+- **Framework**: Gin
+- **Database**: PostgreSQL (pgx/v5)
+- **DI Container**: samber/do v2
+- **Architecture**: Clean Architecture / Hexagonal
+
+### Database
+- **Primary**: PostgreSQL 16
+- **Admin**: pgAdmin4 (optional)
 
 ## Prerequisites
 
-- Docker dan Docker Compose
-- Python 3.11+ (untuk local development)
-- UV package manager (install: `pip install uv`)
+- Docker and Docker Compose
+- Python 3.10+ (for local parser development)
+- Go 1.23+ (for local REST API development)
+- UV package manager: `pip install uv`
 
-## Instalasi
+## Quick Start
 
-### Clone Repository
+### 1. Clone Repository
 
 ```bash
-git clone https://github.com/username/norma.git
+git clone https://github.com/hendrywilliam/norma.git
 cd norma
 ```
 
-### Setup Environment Variables
+### 2. Start PostgreSQL
 
-Buat file `.env` di root project:
+```bash
+# Using Docker (recommended)
+docker run -d \
+  --name peraturan_postgres \
+  -e POSTGRES_DB=peraturan_db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 \
+  postgres:16-alpine
+
+# Or using docker-compose (if uncommented in docker-compose.yml)
+docker-compose up -d postgres
+```
+
+### 3. Run Parser Service
+
+```bash
+cd apps/parser
+
+# Copy environment file
+cp .env.example .env
+
+# Install dependencies
+uv sync
+
+# Run development server
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 4. Run REST API Service
+
+```bash
+cd apps/restapi
+
+# Copy environment file
+cp .env.example .env
+
+# Install dependencies
+go mod tidy
+
+# Run server
+go run cmd/main.go
+```
+
+## Environment Variables
+
+### Parser Service (.env)
 
 ```env
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/peraturan_db
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=peraturan_db
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=peraturan_db
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_MIN_CONNECTIONS=1
+DB_MAX_CONNECTIONS=10
 
-# Parser
-PARSER_HOST=0.0.0.0
-PARSER_PORT=8000
+# API Configuration
+HOST=0.0.0.0
+PORT=8000
+RELOAD=false
+LOG_LEVEL=info
 
 # Peraturan.go.id
-PERATURAN_BASE_URL=https://peraturan.go.id
+BASE_URL=https://peraturan.go.id
 ```
 
-### Start Services dengan Docker
+### REST API Service (.env)
 
-```bash
-# Start semua services
-docker-compose up -d
+```env
+# Server
+SERVER_HOST=0.0.0.0
+SERVER_PORT=8080
+GIN_MODE=debug
 
-# Start PostgreSQL saja
-docker-compose up -d postgres
-
-# Start PostgreSQL dan Parser
-docker-compose --profile parser up -d
-
-# Start dengan PgAdmin (optional)
-docker-compose --profile admin --profile parser up -d
-```
-
-### Install Parser Dependencies untuk Local Development
-
-```bash
-cd apps/parser
-
-# Install dependencies dengan UV
-uv sync
-
-# Install dev dependencies
-uv sync --extra dev
-```
-
-## Running
-
-### Menggunakan Docker (Recommended)
-
-```bash
-# Start parser service
-docker-compose --profile parser up -d parser
-
-# Cek logs
-docker-compose logs -f parser
-
-# Stop service
-docker-compose down
-```
-
-### Local Development
-
-```bash
-# Start PostgreSQL (jika belum berjalan)
-docker-compose up -d postgres
-
-# Run parser development server
-cd apps/parser
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=peraturan_db
+DB_SSLMODE=disable
 ```
 
 ## API Endpoints
 
-Parser API berjalan di `http://localhost:8000`
+### Parser Service (Port 8000)
 
-### Health Check
-```http
-GET /health
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | API info |
+| GET | `/api/health` | Health check |
+| GET | `/api/status` | Parsing status |
+| POST | `/api/parse` | Trigger parsing |
+| GET | `/api/peraturan` | List peraturan |
+| GET | `/api/peraturan/{id}` | Get peraturan detail |
+| GET | `/api/peraturan/{id}/bab` | List bab |
+| GET | `/api/peraturan/{id}/pasals` | List pasal |
+| GET | `/api/peraturan/{id}/pasals/{pasal_id}/ayats` | List ayat |
 
-### Get Parsing Status
-```http
-GET /status
-```
+### REST API Service (Port 8080)
 
-### Trigger Parsing
-```http
-POST /parse
-Content-Type: application/json
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| GET | `/api/v1/peraturan` | List peraturan |
+| GET | `/api/v1/peraturan/:id` | Get peraturan by ID |
+| POST | `/api/v1/peraturan` | Create peraturan |
+| PUT | `/api/v1/peraturan/:id` | Update peraturan |
+| DELETE | `/api/v1/peraturan/:id` | Delete peraturan |
+| GET | `/api/v1/peraturan/search?q=query` | Search peraturan |
+| GET | `/api/v1/peraturan/:id/bab` | List bab |
+| GET | `/api/v1/peraturan/:id/bab/:bab_id` | Get bab by ID |
+| GET | `/api/v1/peraturan/:id/pasal` | List pasal |
+| GET | `/api/v1/peraturan/:id/pasal/:pasal_id` | Get pasal by ID |
+| GET | `/api/v1/peraturan/:id/pasal/:pasal_id/ayat` | List ayat |
+| GET | `/api/v1/peraturan/:id/pasal/:pasal_id/ayat/:ayat_id` | Get ayat by ID |
 
-{
-  "url": "https://peraturan.go.id/peraturan-detail",
-  "category": "UU",
-  "year": 2023,
-  "force": false
-}
-```
+## Database Schema
 
-### List Peraturan
-```http
-GET /api/peraturan?skip=0&limit=20&category=UU&year=2023&search=keyword
-```
+Main tables:
+- `peraturan` - Legal document metadata (UU, PP, Perpres, etc.)
+- `bab` - Chapters (BAB) of legal documents
+- `pasals` - Articles (Pasal) of legal documents
+- `ayats` - Paragraphs (Ayat) of articles
+- `parsing_logs` - Parsing operation logs
 
-### Get Peraturan Detail
-```http
-GET /api/peraturan/{peraturan_id}
-```
-
-### Re-parse Peraturan
-```http
-POST /api/peraturan/{peraturan_id}/reparse
-```
-
-Lihat dokumentasi lengkap API di `apps/parser/README.md`
-
-## Database
-
-### Access PostgreSQL
-
-```bash
-# Menggunakan psql
-docker exec -it peraturan_postgres psql -U postgres -d peraturan_db
-
-# Menggunakan PgAdmin
-# Buka http://localhost:5050
-# Email: admin@peraturan.local
-# Password: admin
-```
-
-### Schema
-
-Tabel utama: `peraturan`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | VARCHAR(255) | Primary Key |
-| judul | VARCHAR(1000) | Judul peraturan |
-| nomor | VARCHAR(100) | Nomor peraturan |
-| tahun | INTEGER | Tahun peraturan |
-| kategori | VARCHAR(50) | Kategori (UU, PP, Perpres, dll) |
-| url | VARCHAR(500) | URL sumber |
-| pdf_url | VARCHAR(500) | URL PDF |
-| konten | TEXT | Konten dari PDF |
-| created_at | TIMESTAMP | Waktu dibuat |
-| updated_at | TIMESTAMP | Waktu diupdate |
+See `apps/parser/DATABASE_SCHEMA.md` for complete schema details.
 
 ## Development
 
-### Testing
+### Parser Service
 
 ```bash
 cd apps/parser
@@ -224,102 +235,100 @@ cd apps/parser
 # Run tests
 uv run pytest
 
-# Run tests dengan coverage
-uv run pytest --cov=parser --cov-report=html
-```
+# Run tests with coverage
+uv run pytest --cov=. --cov-report=html
 
-### Code Quality
-
-```bash
-# Format code dengan Black
+# Format code
 uv run black .
 
-# Lint dengan Ruff
+# Lint code
 uv run ruff check .
-
-# Fix lint issues
 uv run ruff check --fix .
 ```
 
-### Project Structure for Parser
-
-```
-apps/parser/
-├── api/
-│   └── routes.py              # API routes definitions
-├── db/
-│   └── peraturan.py           # Database CRUD operations
-├── models/
-│   └── peraturan.py           # Pydantic models
-├── parser/
-│   ├── scraper.py             # Scraping logic
-│   ├── pdf_parser.py          # PDF parsing logic
-│   └── status.py              # Status management
-├── main.py                     # FastAPI application
-├── pyproject.toml              # Project configuration
-├── Dockerfile                  # Docker container
-└── README.md                   # Parser documentation
-```
-
-## Troubleshooting
-
-### Docker Issues
+### REST API Service
 
 ```bash
-# Cek status containers
-docker-compose ps
+cd apps/restapi
 
-# Cek logs
-docker-compose logs
+# Build binary
+go build -o bin/app cmd/main.go
 
-# Rebuild container
-docker-compose build --no-cache parser
-
-# Reset semua volumes (WARNING: hapus semua data!)
-docker-compose down -v
+# Run tests
+go test ./...
 ```
 
-### Database Issues
+## Docker Deployment
 
 ```bash
-# Reset database
-docker exec -it peraturan_postgres psql -U postgres -d peraturan_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-docker-compose restart postgres
+# Run all services
+docker-compose --profile parser up -d
+
+# Run with pgAdmin
+docker-compose --profile parser --profile admin up -d
+
+# View logs
+docker-compose logs -f parser
+
+# Stop services
+docker-compose down
 ```
 
-### Parser Issues
+## Architecture
 
-```bash
-# Cek parser status
-curl http://localhost:8000/health
+### Parser Service Architecture
 
-# Cek parsing status
-curl http://localhost:8000/status
-
-# Trigger parsing (debug)
-curl -X POST http://localhost:8000/parse \
-  -H "Content-Type: application/json" \
-  -d '{"limit": 5}'
+```
+Client Request
+      │
+      ▼
+  FastAPI Routes (api/routes.py)
+      │
+      ▼
+  Repository Layer (repositories/)
+      │
+      ▼
+  PostgreSQL Database
+      │
+      ▼
+  Parser Modules (parser/)
+      ├── scraper.py (web scraping)
+      └── pdf_parser.py (PDF extraction)
 ```
 
-## Contributing
+### REST API Service Architecture (Clean Architecture)
 
-1. Fork repository
-2. Buat feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push ke branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+```
+Client Request
+      │
+      ▼
+  Handler Layer (internal/handler/)
+      │
+      ▼
+  Service Layer (internal/domain/service/)
+      │
+      ▼
+  Repository Interface (internal/domain/repository/)
+      │
+      ▼
+  Repository Implementation (internal/infrastructure/repository/)
+      │
+      ▼
+  PostgreSQL Database
+```
+
+## Services Comparison
+
+| Feature | Parser (Python) | REST API (Go) |
+|---------|-----------------|---------------|
+| Language | Python 3.10+ | Go 1.23+ |
+| Framework | FastAPI | Gin |
+| Architecture | Layered | Clean Architecture |
+| DI Container | - | samber/do v2 |
+| Database Driver | asyncpg | pgx/v5 |
+| Async Support | Yes (async/await) | Yes (goroutines) |
+| Purpose | Scrape & Parse PDF | CRUD Operations |
 
 ## License
 
-TBD
-
-## Authors
-
-TBD
-
-## Acknowledgments
-
-- Peraturan.go.id untuk sumber data peraturan
-- FastAPI untuk framework backend yang amazing
-- UV untuk package manager yang super cepat
+MIT License
