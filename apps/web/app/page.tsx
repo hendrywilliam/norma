@@ -12,37 +12,6 @@ const stats = [
   { label: "Peraturan Presiden", value: "432", icon: Landmark, color: "bg-civic-teal/10 text-civic-teal" },
 ];
 
-const recentPeraturan = [
-  {
-    id: "UU_13_2024",
-    title: "Undang-Undang tentang Cipta Kerja",
-    category: "UU",
-    year: 2024,
-    date: "15 Jan 2024",
-  },
-  {
-    id: "PP_35_2024",
-    title: "Peraturan Pemerintah tentang Penyelenggaraan Perumahan",
-    category: "PP",
-    year: 2024,
-    date: "10 Jan 2024",
-  },
-  {
-    id: "Perpres_12_2024",
-    title: "Peraturan Presiden tentang Rencana Pembangunan Jangka Menengah",
-    category: "Perpres",
-    year: 2024,
-    date: "5 Jan 2024",
-  },
-  {
-    id: "UU_11_2024",
-    title: "Undang-Undang tentang ITE",
-    category: "UU",
-    year: 2024,
-    date: "1 Jan 2024",
-  },
-];
-
 const categories = [
   { name: "Undang-Undang (UU)", count: "1,234", href: "/peraturan?kategori=UU" },
   { name: "Peraturan Pemerintah (PP)", count: "856", href: "/peraturan?kategori=PP" },
@@ -59,7 +28,32 @@ const categoryColors: Record<string, string> = {
   Permen: "bg-civic-teal/10 text-civic-teal hover:bg-civic-teal/20",
 };
 
-export default function HomePage() {
+interface Peraturan {
+  id: string;
+  judul: string;
+  nomor: string;
+  tahun: number;
+  kategori: string;
+  tentang: string;
+  status: string;
+}
+
+async function getRecentPeraturan(): Promise<Peraturan[]> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/peraturan?limit=4`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function HomePage() {
+  const recentPeraturan = await getRecentPeraturan();
+
   return (
     <div className="space-y-12">
       {/* Hero Section */}
@@ -74,17 +68,20 @@ export default function HomePage() {
         
         {/* Search Box */}
         <div className="max-w-2xl mx-auto">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Cari peraturan berdasarkan judul, nomor, atau kata kunci..."
-              className="h-14 pl-12 pr-4 text-base rounded-xl shadow-sm focus:border-primary focus:ring-primary"
-            />
-            <Button className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg">
-              Cari
-            </Button>
-          </div>
+          <form action="/peraturan" method="GET">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                name="search"
+                placeholder="Cari peraturan berdasarkan judul, nomor, atau kata kunci..."
+                className="h-14 pl-12 pr-4 text-base rounded-xl shadow-sm focus:border-primary focus:ring-primary"
+              />
+              <Button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg">
+                Cari
+              </Button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -138,33 +135,44 @@ export default function HomePage() {
             Lihat Semua <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {recentPeraturan.map((peraturan) => (
-            <Card key={peraturan.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <Badge className={categoryColors[peraturan.category] || "bg-muted text-muted-foreground"}>
-                    {peraturan.category}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">{peraturan.year}</span>
-                </div>
-                <CardTitle className="text-lg line-clamp-2 mt-2">
-                  <Link
-                    href={`/peraturan/${peraturan.id}`}
-                    className="hover:text-primary transition-colors"
-                  >
-                    {peraturan.title}
-                  </Link>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Disahkan: {peraturan.date}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {recentPeraturan.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">Tidak ada data peraturan. Pastikan backend API berjalan di {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Jalankan parser service untuk mengisi data.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {recentPeraturan.map((peraturan) => (
+              <Card key={peraturan.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <Badge className={categoryColors[peraturan.kategori] || "bg-muted text-muted-foreground"}>
+                      {peraturan.kategori}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">{peraturan.tahun}</span>
+                  </div>
+                  <CardTitle className="text-lg line-clamp-2 mt-2">
+                    <Link
+                      href={`/peraturan/${peraturan.id}`}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {peraturan.judul}
+                    </Link>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    {peraturan.tentang}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

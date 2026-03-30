@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,10 @@ import {
   FileText,
   BookOpen,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const categoryColors: Record<string, string> = {
   UU: "bg-primary/10 text-primary",
@@ -32,44 +34,112 @@ const categoryColors: Record<string, string> = {
   Permen: "bg-civic-teal/10 text-civic-teal",
 };
 
-const mockPeraturan = {
-  id: "UU_11_2024_abc123",
-  judul: "Undang-Undang tentang Informasi dan Transaksi Elektronik",
-  nomor: "11",
-  tahun: 2024,
-  kategori: "UU",
-  jenisPeraturan: "Undang-Undang",
-  status: "Berlaku",
-  tentang: "Undang-Undang tentang Informasi dan Transaksi Elektronik",
-  pemrakarsa: "Kementerian Komunikasi dan Informatika",
-  tempatPenetapan: "Jakarta",
-  tanggalDitetapkan: "2024-01-15",
-  tahunDiumulkan: "2024",
-  pdfUrl: "https://peraturan.go.id/download/uu_11_2024.pdf",
-  url: "https://peraturan.go.id/id/uu_11_2024",
-};
+interface Peraturan {
+  id: string;
+  judul: string;
+  nomor: string;
+  tahun: number;
+  kategori: string;
+  tentang: string;
+  status: string;
+  pdf_url: string;
+  url: string;
+  pemrakarsa: string;
+  tanggal_ditetapkan: string;
+}
 
-const mockBab = [
-  { id: 1, nomorBab: "I", judulBab: "Ketentuan Umum", jumlahPasal: 5 },
-  { id: 2, nomorBab: "II", judulBab: "Asas dan Tujuan", jumlahPasal: 3 },
-  { id: 3, nomorBab: "III", judulBab: "Informasi dan Dokumen Elektronik", jumlahPasal: 12 },
-  { id: 4, nomorBab: "IV", judulBab: "Transaksi Elektronik", jumlahPasal: 8 },
-  { id: 5, nomorBab: "V", judulBab: "Tanda Tangan Elektronik", jumlahPasal: 6 },
-  { id: 6, nomorBab: "VI", judulBab: "Penyelenggaraan Sistem Elektronik", jumlahPasal: 15 },
-  { id: 7, nomorBab: "VII", judulBab: "Sertifikasi Elektronik", jumlahPasal: 4 },
-  { id: 8, nomorBab: "VIII", judulBab: "Ketentuan Pidana", jumlahPasal: 10 },
-  { id: 9, nomorBab: "IX", judulBab: "Ketentuan Peralihan", jumlahPasal: 2 },
-  { id: 10, nomorBab: "X", judulBab: "Ketentuan Penutup", jumlahPasal: 3 },
-];
+interface Bab {
+  id: number;
+  nomor_bab: string;
+  judul_bab: string;
+  urutan: number;
+}
 
-const mockPasal = [
-  { nomor: "1", konten: "Dalam Undang-Undang ini yang dimaksud dengan...", ayatCount: 5 },
-  { nomor: "2", konten: "Informasi Elektronik adalah satu informasi atau...", ayatCount: 3 },
-  { nomor: "3", konten: "Transaksi Elektronik adalah perbuatan hukum...", ayatCount: 4 },
-];
+interface Pasal {
+  id: number;
+  nomor_pasal: string;
+  judul_pasal: string;
+  konten_pasal: string;
+  urutan: number;
+}
 
 export default function PeraturanDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
+
+  const [peraturan, setPeraturan] = useState<Peraturan | null>(null);
+  const [babList, setBabList] = useState<Bab[]>([]);
+  const [pasalList, setPasalList] = useState<Pasal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expandedBab, setExpandedBab] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch peraturan detail
+        const peraturanRes = await fetch(`/api/peraturan/${id}`);
+        if (!peraturanRes.ok) {
+          throw new Error("Failed to fetch peraturan");
+        }
+        const peraturanData = await peraturanRes.json();
+        setPeraturan(peraturanData.data);
+
+        // Fetch bab list
+        const babRes = await fetch(`/api/peraturan/${id}/bab`);
+        if (babRes.ok) {
+          const babData = await babRes.json();
+          setBabList(babData.data || []);
+        }
+
+        // Fetch pasal list
+        const pasalRes = await fetch(`/api/peraturan/${id}/pasal`);
+        if (pasalRes.ok) {
+          const pasalData = await pasalRes.json();
+          setPasalList(pasalData.data || []);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (id) {
+      fetchData();
+    }
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !peraturan) {
+    return (
+      <div className="space-y-8">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/peraturan" className="flex items-center gap-2">
+            <ChevronLeft className="h-4 w-4" />
+            Kembali ke Daftar Peraturan
+          </Link>
+        </Button>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">{error || "Peraturan tidak ditemukan"}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Pastikan backend API berjalan dan data tersedia.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -89,60 +159,68 @@ export default function PeraturanDetailPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Badge className={categoryColors[mockPeraturan.kategori] || "bg-muted text-muted-foreground"}>
-                  {mockPeraturan.kategori}
+                <Badge className={categoryColors[peraturan.kategori] || "bg-muted text-muted-foreground"}>
+                  {peraturan.kategori}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {mockPeraturan.jenisPeraturan} Nomor {mockPeraturan.nomor} Tahun {mockPeraturan.tahun}
+                  Nomor {peraturan.nomor} Tahun {peraturan.tahun}
                 </span>
               </div>
-              <CardTitle className="text-2xl">{mockPeraturan.judul}</CardTitle>
-              <p className="text-muted-foreground">{mockPeraturan.tentang}</p>
+              <CardTitle className="text-2xl">{peraturan.judul}</CardTitle>
+              <p className="text-muted-foreground">{peraturan.tentang}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm">
                 <Share2 className="h-4 w-4 mr-2" />
                 Bagikan
               </Button>
-              <Button size="sm" asChild>
-                <a href={mockPeraturan.pdfUrl} target="_blank" rel="noopener noreferrer">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </a>
-              </Button>
+              {peraturan.pdf_url && (
+                <Button size="sm" asChild>
+                  <a href={peraturan.pdf_url} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="flex items-center gap-2">
-              <Building className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Pemrakarsa:</span>
-              <span className="text-sm font-medium">{mockPeraturan.pemrakarsa}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Ditetapkan:</span>
-              <span className="text-sm font-medium">{mockPeraturan.tanggalDitetapkan}</span>
-            </div>
+            {peraturan.pemrakarsa && (
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Pemrakarsa:</span>
+                <span className="text-sm font-medium">{peraturan.pemrakarsa}</span>
+              </div>
+            )}
+            {peraturan.tanggal_ditetapkan && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Ditetapkan:</span>
+                <span className="text-sm font-medium">{peraturan.tanggal_ditetapkan}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Status:</span>
               <span className="inline-flex items-center rounded-full bg-civic-emerald/10 px-2 py-0.5 text-xs font-medium text-civic-emerald">
-                {mockPeraturan.status}
+                {peraturan.status || "Berlaku"}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              <a
-                href={mockPeraturan.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Lihat di Peraturan.go.id
-              </a>
-            </div>
+            {peraturan.url && (
+              <div className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                <a
+                  href={peraturan.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Lihat di Peraturan.go.id
+                </a>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -165,81 +243,82 @@ export default function PeraturanDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            Daftar BAB
+            Daftar BAB ({babList.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="divide-y">
-            {mockBab.map((bab) => (
-              <div key={bab.id}>
-                <button
-                  className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
-                  onClick={() => setExpandedBab(expandedBab === bab.id ? null : bab.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <ChevronRight
-                      className={`h-4 w-4 text-muted-foreground transition-transform ${
-                        expandedBab === bab.id ? "rotate-90" : ""
-                      }`}
-                    />
-                    <span className="font-medium">BAB {bab.nomorBab}</span>
-                    <span className="text-muted-foreground">{bab.judulBab}</span>
-                  </div>
-                  <Badge variant="secondary">{bab.jumlahPasal} Pasal</Badge>
-                </button>
-                
-                {expandedBab === bab.id && (
-                  <div className="bg-muted/30 p-4 pl-12">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      BAB {bab.nomorBab} berisi {bab.jumlahPasal} pasal yang membahas tentang {bab.judulBab.toLowerCase()}.
-                    </p>
-                    <Button variant="outline" size="sm">
-                      Lihat Semua Pasal
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          {babList.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <p>Tidak ada data BAB</p>
+              <p className="text-sm mt-2">Jalankan parser service untuk mengisi data.</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {babList.map((bab) => (
+                <div key={bab.id}>
+                  <button
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+                    onClick={() => setExpandedBab(expandedBab === bab.id ? null : bab.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <ChevronRight
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${
+                          expandedBab === bab.id ? "rotate-90" : ""
+                        }`}
+                      />
+                      <span className="font-medium">BAB {bab.nomor_bab}</span>
+                      <span className="text-muted-foreground">{bab.judul_bab}</span>
+                    </div>
+                  </button>
+                  
+                  {expandedBab === bab.id && (
+                    <div className="bg-muted/30 p-4 pl-12">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        BAB {bab.nomor_bab} - {bab.judul_bab}
+                      </p>
+                      <Button variant="outline" size="sm">
+                        Lihat Semua Pasal
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Preview Pasal */}
+      {/* Pasal Preview */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Preview Pasal</CardTitle>
+          <CardTitle className="text-lg">Preview Pasal ({pasalList.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Pasal</TableHead>
-                <TableHead>Isi Ringkas</TableHead>
-                <TableHead className="w-[80px]">Ayat</TableHead>
-                <TableHead className="w-[80px]">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockPasal.map((pasal) => (
-                <TableRow key={pasal.nomor} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">Pasal {pasal.nomor}</TableCell>
-                  <TableCell className="text-muted-foreground line-clamp-2">{pasal.konten}</TableCell>
-                  <TableCell>{pasal.ayatCount} ayat</TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      asChild
-                    >
-                      <Link href={`/peraturan/${mockPeraturan.id}/pasal/${pasal.nomor}`}>
-                        Detail
-                      </Link>
-                    </Button>
-                  </TableCell>
+          {pasalList.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <p>Tidak ada data Pasal</p>
+              <p className="text-sm mt-2">Jalankan parser service untuk mengisi data.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Pasal</TableHead>
+                  <TableHead>Isi Ringkas</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {pasalList.slice(0, 10).map((pasal) => (
+                  <TableRow key={pasal.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">Pasal {pasal.nomor_pasal}</TableCell>
+                    <TableCell className="text-muted-foreground line-clamp-2">
+                      {pasal.konten_pasal || pasal.judul_pasal}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
