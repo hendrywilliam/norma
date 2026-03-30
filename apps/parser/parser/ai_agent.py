@@ -137,8 +137,6 @@ IMPORTANT:
 
         prompt = self._build_extraction_prompt(context or {})
 
-        logger.info(self.config.model)
-
         messages = [
             {
                 "role": "user",

@@ -1,6 +1,6 @@
-# Norma - Indonesian Legal Documents Database & Chatbot
+# Norma - Indonesian Legal Documents Database
 
-Platform for managing and querying Indonesian legal documents (peraturan) from peraturan.go.id.
+Platform for managing and querying Indonesian legal documents (peraturan) from peraturan.go.id with AI-powered parsing using GLM-4V Vision Model.
 
 ## Project Structure
 
@@ -11,39 +11,54 @@ norma/
 │   │   ├── api/                    # API routes
 │   │   ├── db/                     # Database operations
 │   │   ├── models/                 # Pydantic data models
+│   │   │   ├── peraturan.py        # Peraturan model
+│   │   │   ├── bab.py              # Bab model
+│   │   │   ├── pasal.py            # Pasal model
+│   │   │   ├── ayat.py             # Ayat model
+│   │   │   └── ai_parse.py         # AI parsing models
 │   │   ├── parser/                 # Core parsing logic
 │   │   │   ├── scraper.py          # peraturan.go.id scraper
 │   │   │   ├── pdf_parser.py       # PDF parser
+│   │   │   ├── ai_agent.py         # GLM-4V vision model integration
 │   │   │   └── status.py           # Parsing status management
 │   │   ├── repositories/           # Database repositories
 │   │   ├── migrations/             # SQL migration files
-│   │   ├── main.py                # FastAPI entry point
-│   │   ├── pyproject.toml         # UV package configuration
-│   │   └── Dockerfile             # Docker container
+│   │   ├── main.py                 # FastAPI entry point
+│   │   ├── pyproject.toml          # UV package configuration
+│   │   └── README.md               # Parser documentation
 │   │
 │   ├── restapi/                   # REST API Service (Go/Gin)
-│   │   ├── cmd/main.go            # Entry point
+│   │   ├── cmd/main.go             # Entry point
 │   │   ├── internal/
 │   │   │   ├── config/            # Configuration loader
 │   │   │   ├── container/         # DI Container (samber/do)
 │   │   │   ├── domain/            # Domain layer
-│   │   │   │   ├── model/        # Entity models
-│   │   │   │   ├── repository/   # Repository interfaces
-│   │   │   │   └── service/      # Business logic
-│   │   │   ├── handler/          # HTTP handlers
-│   │   │   └── infrastructure/   # Infrastructure layer
-│   │   │       └── repository/   # Repository implementations
+│   │   │   ├── handler/           # HTTP handlers
+│   │   │   └── infrastructure/    # Infrastructure layer
 │   │   ├── pkg/
-│   │   │   ├── database/         # Database connection
-│   │   │   └── response/        # HTTP response helpers
+│   │   │   ├── database/          # Database connection
+│   │   │   └── response/           # HTTP response helpers
 │   │   ├── go.mod
 │   │   └── README.md
 │   │
-│   └── web/                       # Frontend (Planned)
+│   └── web/                        # Frontend (Next.js)
+│       ├── app/
+│       │   ├── layout.tsx          # Root layout
+│       │   ├── page.tsx             # Homepage
+│       │   ├── globals.css          # Civic Ledger theme
+│       │   └── peraturan/
+│       │       ├── page.tsx         # Peraturan list
+│       │       └── [id]/page.tsx    # Peraturan detail
+│       ├── components/
+│       │   ├── navbar.tsx          # Navigation
+│       │   └── ui/                  # shadcn components
+│       ├── lib/utils.ts            # Utilities
+│       ├── package.json
+│       └── README.md
 │
 ├── docker/
 │   └── postgres/
-│       └── init.sql              # Database init script
+│       └── init.sql               # Database init script
 │
 ├── docker-compose.yml            # Docker services
 └── README.md                     # This file
@@ -52,9 +67,16 @@ norma/
 ## Features
 
 - **Parser Service**: Scrape and parse PDF documents from peraturan.go.id
+  - Web scraping from peraturan.go.id
+  - PDF to image conversion (PyMuPDF)
+  - AI-powered parsing with GLM-4V Vision Model
+  - Extract BAB, Pasal, Ayat structure
 - **REST API**: Manage legal documents with Clean Architecture (Go)
+- **Web Frontend**: Next.js 16 with shadcn/ui components
+  - Civic Ledger theme (professional legal document styling)
+  - Responsive design
+  - Peraturan browsing and search
 - **Database**: PostgreSQL with full-text search support
-- **Chatbot**: AI-powered Q&A about legal documents (Planned)
 
 ## Tech Stack
 
@@ -62,7 +84,8 @@ norma/
 - **Language**: Python 3.10+
 - **Framework**: FastAPI
 - **Package Manager**: UV
-- **PDF Parsing**: pdfplumber, PyMuPDF
+- **PDF Processing**: pdfplumber, PyMuPDF
+- **AI Vision**: GLM-4V (Zhipu AI)
 - **Web Scraping**: aiohttp + BeautifulSoup4
 - **Database**: PostgreSQL (asyncpg)
 
@@ -73,6 +96,14 @@ norma/
 - **DI Container**: samber/do v2
 - **Architecture**: Clean Architecture / Hexagonal
 
+### Web Frontend (Next.js)
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **UI Components**: shadcn/ui
+- **Theme**: Civic Ledger (professional legal document styling)
+- **Icons**: Lucide React
+
 ### Database
 - **Primary**: PostgreSQL 16
 - **Admin**: pgAdmin4 (optional)
@@ -82,7 +113,9 @@ norma/
 - Docker and Docker Compose
 - Python 3.10+ (for local parser development)
 - Go 1.23+ (for local REST API development)
+- Node.js 18+ (for web development)
 - UV package manager: `pip install uv`
+- Bun: `npm install -g bun`
 
 ## Quick Start
 
@@ -105,7 +138,7 @@ docker run -d \
   -p 5432:5432 \
   postgres:16-alpine
 
-# Or using docker-compose (if uncommented in docker-compose.yml)
+# Or using docker-compose
 docker-compose up -d postgres
 ```
 
@@ -124,7 +157,19 @@ uv sync
 uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 4. Run REST API Service
+### 4. Run Web Frontend
+
+```bash
+cd apps/web
+
+# Install dependencies
+bun install
+
+# Run development server
+bun dev
+```
+
+### 5. Run REST API Service
 
 ```bash
 cd apps/restapi
@@ -159,6 +204,13 @@ PORT=8000
 RELOAD=false
 LOG_LEVEL=info
 
+# GLM AI Configuration (for AI-based parsing)
+GLM_API_KEY=your_glm_api_key_here
+GLM_MODEL=glm-4v
+GLM_MAX_TOKENS=4096
+GLM_TEMPERATURE=0.1
+GLM_TIMEOUT=120
+
 # Peraturan.go.id
 BASE_URL=https://peraturan.go.id
 ```
@@ -186,10 +238,13 @@ DB_SSLMODE=disable
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | API info |
 | GET | `/api/health` | Health check |
 | GET | `/api/status` | Parsing status |
-| POST | `/api/parse` | Trigger parsing |
+| POST | `/api/parse` | Trigger AI parsing (GLM-4V) |
+| POST | `/api/parse/ai` | Trigger AI parsing for existing peraturan |
+| POST | `/api/parse/ai/url` | AI parse from PDF URL |
+| GET | `/api/parse/ai/status/{job_id}` | Get AI parsing job status |
+| GET | `/api/parse/ai/result/{job_id}` | Get AI parsing result |
 | GET | `/api/peraturan` | List peraturan |
 | GET | `/api/peraturan/{id}` | Get peraturan detail |
 | GET | `/api/peraturan/{id}/bab` | List bab |
@@ -208,11 +263,52 @@ DB_SSLMODE=disable
 | DELETE | `/api/v1/peraturan/:id` | Delete peraturan |
 | GET | `/api/v1/peraturan/search?q=query` | Search peraturan |
 | GET | `/api/v1/peraturan/:id/bab` | List bab |
-| GET | `/api/v1/peraturan/:id/bab/:bab_id` | Get bab by ID |
 | GET | `/api/v1/peraturan/:id/pasal` | List pasal |
-| GET | `/api/v1/peraturan/:id/pasal/:pasal_id` | Get pasal by ID |
 | GET | `/api/v1/peraturan/:id/pasal/:pasal_id/ayat` | List ayat |
-| GET | `/api/v1/peraturan/:id/pasal/:pasal_id/ayat/:ayat_id` | Get ayat by ID |
+
+### Web Frontend (Port 3000)
+
+| Path | Description |
+|------|-------------|
+| `/` | Homepage with search and statistics |
+| `/peraturan` | Peraturan list with filters |
+| `/peraturan/[id]` | Peraturan detail with BAB/Pasal structure |
+
+## AI Parsing Flow
+
+```
+POST /api/parse
+       │
+       ▼
+┌─────────────────────────┐
+│  1. Load GLM_API_KEY    │ → from environment
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  2. Scrape HTML         │ → metadata (judul, nomor, pdf_url)
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  3. Download PDF        │
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  4. PDF → Images        │ → PyMuPDF convert pages
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  5. GLM-4V Vision       │ → Extract BAB, Pasal, Ayat
+└───────────┬─────────────┘
+            │
+            ▼
+┌─────────────────────────┐
+│  6. Save to Database    │ → peraturan, bab, pasal, ayat
+└─────────────────────────┘
+```
 
 ## Database Schema
 
@@ -239,11 +335,26 @@ uv run pytest
 uv run pytest --cov=. --cov-report=html
 
 # Format code
-uv run black .
+uv run ruff format .
 
 # Lint code
 uv run ruff check .
 uv run ruff check --fix .
+```
+
+### Web Frontend
+
+```bash
+cd apps/web
+
+# Run development server
+bun dev
+
+# Build for production
+bun run build
+
+# Run lint
+bun run lint
 ```
 
 ### REST API Service
@@ -285,49 +396,47 @@ Client Request
   FastAPI Routes (api/routes.py)
       │
       ▼
+  GLM-4V Agent (parser/ai_agent.py)
+      │
+      ├── PDF → Images (PyMuPDF)
+      │
+      └── GLM-4V API → Extract Structure
+           │
+           ▼
   Repository Layer (repositories/)
       │
       ▼
   PostgreSQL Database
-      │
-      ▼
-  Parser Modules (parser/)
-      ├── scraper.py (web scraping)
-      └── pdf_parser.py (PDF extraction)
 ```
 
-### REST API Service Architecture (Clean Architecture)
+### Web Frontend Architecture
 
 ```
-Client Request
+Next.js App Router
       │
-      ▼
-  Handler Layer (internal/handler/)
+      ├── Layout (navbar, theme)
       │
-      ▼
-  Service Layer (internal/domain/service/)
+      ├── Homepage
+      │   ├── Search
+      │   ├── Statistics Cards
+      │   └── Recent Peraturan
       │
-      ▼
-  Repository Interface (internal/domain/repository/)
-      │
-      ▼
-  Repository Implementation (internal/infrastructure/repository/)
-      │
-      ▼
-  PostgreSQL Database
+      └── Peraturan Pages
+          ├── List (filter, search, table)
+          └── Detail (BAB accordion, Pasal preview)
 ```
 
-## Services Comparison
+## Theme: Civic Ledger
 
-| Feature | Parser (Python) | REST API (Go) |
-|---------|-----------------|---------------|
-| Language | Python 3.10+ | Go 1.23+ |
-| Framework | FastAPI | Gin |
-| Architecture | Layered | Clean Architecture |
-| DI Container | - | samber/do v2 |
-| Database Driver | asyncpg | pgx/v5 |
-| Async Support | Yes (async/await) | Yes (goroutines) |
-| Purpose | Scrape & Parse PDF | CRUD Operations |
+The web frontend uses the **Civic Ledger** theme designed for professional legal document interfaces:
+
+- **Primary**: Deep Navy Blue (`#1e3a5f`)
+- **Accents**: 
+  - Emerald (PP badges)
+  - Amber (Perpres badges)
+  - Teal (Permen badges)
+- **Typography**: Inter font
+- **Components**: shadcn/ui with Tailwind CSS v4
 
 ## License
 
