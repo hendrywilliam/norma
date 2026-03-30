@@ -5,6 +5,7 @@ CRUD operations untuk tabel ayat
 
 from typing import List, Dict, Optional, Any
 import logging
+import json
 
 # Import db connection management
 from db import get_db_connection, execute_query
@@ -53,7 +54,7 @@ class AyatRepository:
                     ayat_data.get("nomor_ayat"),
                     ayat_data.get("konten_ayat"),
                     ayat_data.get("urutan"),
-                    ayat_data.get("metadata", {}),
+                    ayat_data.get("metadata", json.dumps({})),
                     ayat_data.get("pasal_id"),
                 ),
                 fetch="val",

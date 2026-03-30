@@ -14,7 +14,7 @@ from .peraturan import (
     PeraturanDetail,
     PeraturanMetadata,
     ParseResult,
-    PeraturanFullResponse
+    PeraturanFullResponse,
 )
 
 from .bab import (
@@ -26,7 +26,7 @@ from .bab import (
     BabWithPasalCount,
     BabWithPeraturanInfo,
     BabListResponse,
-    BabFilter
+    BabFilter,
 )
 
 from .pasal import (
@@ -38,7 +38,7 @@ from .pasal import (
     PasalWithAyatCount,
     PasalWithBabPeraturan,
     PasalListResponse,
-    PasalFilter
+    PasalFilter,
 )
 
 from .ayat import (
@@ -51,7 +51,17 @@ from .ayat import (
     AyatWithBabInfo,
     AyatWithPasalBabPeraturan,
     AyatListResponse,
-    AyatFilter
+    AyatFilter,
+)
+
+from .ai_parse import (
+    AIParseRequest,
+    AIParseResult,
+    AIParsePerPageResult,
+    AIParsingStatus,
+    AIBatchParseRequest,
+    AIBatchParseResult,
+    GLMConfigModel,
 )
 
 __all__ = [
@@ -98,5 +108,13 @@ __all__ = [
     "AyatWithBabInfo",
     "AyatWithPasalBabPeraturan",
     "AyatListResponse",
-    "AyatFilter"
+    "AyatFilter",
+    # AI Parse
+    "AIParseRequest",
+    "AIParseResult",
+    "AIParsePerPageResult",
+    "AIParsingStatus",
+    "AIBatchParseRequest",
+    "AIBatchParseResult",
+    "GLMConfigModel",
 ]

@@ -3,6 +3,7 @@ API Routes untuk Parser
 API routes untuk trigger parsing, cek status, dan query peraturan, bab, pasal, ayat
 """
 
+import os
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -61,17 +62,14 @@ logger = logging.getLogger(__name__)
 # Initialize router
 router = APIRouter(tags=["Parser API"])
 
-# ========================================
-# ========================================
-# Request/Response Models untuk Parsing (Local ke routes)
-# ========================================
-
 
 class ParseRequest(BaseModel):
     url: Optional[str] = None
     category: Optional[str] = None
     year: Optional[int] = None
     force: bool = False
+    model: str = "glm-4.6v"
+    concurrency: int = 3
 
 
 class ParseResponse(BaseModel):
@@ -134,11 +132,21 @@ async def get_status():
 
 @router.post("/parse", response_model=ParseResponse)
 async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks):
-    """Trigger parsing process
+    """Trigger AI parsing process
 
     Args:
-        request: Parse request dengan parameter filter
-        background_tasks: FastAPI background tasks untuk async execution
+        request: Parse request dengan parameter:
+        - url: URL spesifik atau kosong untuk semua peraturan
+        - api_key: GLM API key (wajib)
+        - model: GLM model (default: glm-4v)
+        - concurrency: Concurrent page processing (default: 3)
+
+    Flow:
+        1. Scrape HTML → ambil metadata (judul, nomor, tahun, pdf_url)
+        2. Download PDF dari pdf_url
+        3. Convert PDF pages → Images (base64)
+        4. Send to GLM-4V vision → Extract BAB, Pasal, Ayat
+        5. Save to Database
 
     Returns:
         ParseResponse dengan status job
@@ -163,7 +171,7 @@ async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks
 
     return ParseResponse(
         status="queued",
-        message=f"Parsing task di-queue: {request.url if request.url else 'semua peraturan'}",
+        message=f"AI Parsing task di-queue: {request.url if request.url else 'semua peraturan'}",
         job_id=job_id,
         estimated_time=estimated_time,
     )
@@ -501,22 +509,449 @@ async def list_ayat_by_pasal(peraturan_id: str, pasal_id: int, skip: int = 0, li
 
 
 # ========================================
+# AI Parsing Endpoints
+# ========================================
+
+
+_ai_parse_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+@router.post("/parse/ai", response_model=ParseResponse)
+async def trigger_ai_parse(
+    peraturan_id: str,
+    background_tasks: BackgroundTasks,
+    model: str = "glm-4.6v",
+    concurrency: int = 3,
+):
+    """Trigger AI-based PDF parsing using GLM-4V vision model
+
+    Args:
+        peraturan_id: ID peraturan yang akan di-parse
+        background_tasks: FastAPI background tasks
+        model: GLM model to use (glm-4v or glm-4v)
+        concurrency: Number of concurrent page processing
+
+    Returns:
+        ParseResponse dengan status job
+    """
+    from parser.status import get_parse_status
+
+    api_key = os.getenv("GLM_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GLM_API_KEY tidak ditemukan di environment variables",
+        )
+
+    status = get_parse_status()
+    if status["is_running"]:
+        raise HTTPException(status_code=400, detail="Parsing sedang berjalan. Coba lagi nanti.")
+
+    job_id = f"ai_parse_{peraturan_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    _ai_parse_jobs[job_id] = {
+        "status": "queued",
+        "peraturan_id": peraturan_id,
+        "started_at": None,
+        "completed_at": None,
+        "progress": 0,
+        "current_page": 0,
+        "total_pages": 0,
+        "error": None,
+        "result": None,
+    }
+
+    background_tasks.add_task(
+        run_ai_parse_task,
+        job_id=job_id,
+        peraturan_id=peraturan_id,
+        api_key=api_key,
+        model=model,
+        concurrency=concurrency,
+    )
+
+    return ParseResponse(
+        status="queued",
+        message=f"AI parsing task di-queue untuk peraturan {peraturan_id}",
+        job_id=job_id,
+        estimated_time=120,
+    )
+
+
+@router.post("/parse/ai/url", response_model=ParseResponse)
+async def trigger_ai_parse_from_url(
+    pdf_url: str,
+    background_tasks: BackgroundTasks,
+    judul: Optional[str] = None,
+    nomor: Optional[str] = None,
+    tahun: Optional[int] = None,
+    kategori: str = "UU",
+    model: str = "glm-4.6v",
+    concurrency: int = 3,
+):
+    """Trigger AI-based PDF parsing from a URL directly
+
+    Args:
+        pdf_url: URL to PDF file
+        background_tasks: FastAPI background tasks
+        judul: Judul peraturan (optional)
+        nomor: Nomor peraturan (optional)
+        tahun: Tahun peraturan (optional)
+        kategori: Kategori peraturan (default: UU)
+        model: GLM model to use
+        concurrency: Number of concurrent page processing
+
+    Returns:
+        ParseResponse dengan status job
+    """
+    from parser.status import get_parse_status
+
+    api_key = os.getenv("GLM_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GLM_API_KEY tidak ditemukan di environment variables",
+        )
+
+    status = get_parse_status()
+    if status["is_running"]:
+        raise HTTPException(status_code=400, detail="Parsing sedang berjalan. Coba lagi nanti.")
+
+    import hashlib
+
+    url_hash = hashlib.md5(pdf_url.encode()).hexdigest()[:8]
+    peraturan_id = f"{kategori}_{nomor or 'unknown'}_{tahun or 0}_{url_hash}".upper()
+
+    job_id = f"ai_parse_url_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    _ai_parse_jobs[job_id] = {
+        "status": "queued",
+        "peraturan_id": peraturan_id,
+        "started_at": None,
+        "completed_at": None,
+        "progress": 0,
+        "current_page": 0,
+        "total_pages": 0,
+        "error": None,
+        "result": None,
+    }
+
+    background_tasks.add_task(
+        run_ai_parse_from_url_task,
+        job_id=job_id,
+        pdf_url=pdf_url,
+        peraturan_id=peraturan_id,
+        api_key=api_key,
+        peraturan_info={
+            "judul": judul,
+            "nomor": nomor,
+            "tahun": tahun,
+            "kategori": kategori,
+        },
+        model=model,
+        concurrency=concurrency,
+    )
+
+    return ParseResponse(
+        status="queued",
+        message=f"AI parsing task di-queue untuk PDF dari URL",
+        job_id=job_id,
+        estimated_time=120,
+    )
+
+
+@router.get("/parse/ai/status/{job_id}")
+async def get_ai_parse_status(job_id: str):
+    """Get status of AI parsing job
+
+    Args:
+        job_id: Job ID returned from trigger_ai_parse
+
+    Returns:
+        Dictionary with job status
+    """
+    if job_id not in _ai_parse_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = _ai_parse_jobs[job_id]
+
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "peraturan_id": job["peraturan_id"],
+        "progress": job["progress"],
+        "current_page": job["current_page"],
+        "total_pages": job["total_pages"],
+        "started_at": job["started_at"],
+        "completed_at": job["completed_at"],
+        "error": job["error"],
+        "result": job["result"],
+    }
+
+
+@router.get("/parse/ai/result/{job_id}")
+async def get_ai_parse_result(job_id: str):
+    """Get result of completed AI parsing job
+
+    Args:
+        job_id: Job ID returned from trigger_ai_parse
+
+    Returns:
+        AIParseResult with parsed structure
+    """
+    if job_id not in _ai_parse_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = _ai_parse_jobs[job_id]
+
+    if job["status"] != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job status is {job['status']}, not completed",
+        )
+
+    return job["result"]
+
+
+async def run_ai_parse_task(
+    job_id: str,
+    peraturan_id: str,
+    api_key: str,
+    model: str,
+    concurrency: int,
+):
+    """Background task untuk AI parsing"""
+    from parser.ai_agent import parse_pdf_with_ai
+    from parser.status import update_parse_status
+    from repositories.peraturan import peraturan_repository
+    from repositories.bab import bab_repository
+    from repositories.pasal import pasal_repository
+    from repositories.ayat import ayat_repository
+    import time
+
+    _ai_parse_jobs[job_id]["status"] = "running"
+    _ai_parse_jobs[job_id]["started_at"] = datetime.now().isoformat()
+
+    try:
+        peraturan = await peraturan_repository.get_by_id(peraturan_id)
+        if not peraturan:
+            raise ValueError(f"Peraturan {peraturan_id} not found")
+
+        pdf_url = peraturan.get("pdf_url")
+        if not pdf_url:
+            raise ValueError("Tidak ada PDF URL")
+
+        update_parse_status(
+            job_id=job_id, current_task=f"AI Parsing: {peraturan.get('judul', 'Unknown')}"
+        )
+
+        start_time = time.time()
+
+        ai_result = await parse_pdf_with_ai(
+            pdf_source=pdf_url,
+            api_key=api_key,
+            peraturan_info={
+                "judul": peraturan.get("judul"),
+                "nomor": peraturan.get("nomor"),
+                "tahun": peraturan.get("tahun"),
+                "kategori": peraturan.get("kategori"),
+            },
+            model=model,
+            concurrency=concurrency,
+        )
+
+        _ai_parse_jobs[job_id]["total_pages"] = ai_result["page_count"]
+        _ai_parse_jobs[job_id]["progress"] = 100
+
+        processing_time = time.time() - start_time
+
+        bab_list = []
+        for bab in ai_result["bab_list"]:
+            bab_list.append(
+                {
+                    "peraturan_id": peraturan_id,
+                    "nomor_bab": bab.get("nomor_bab"),
+                    "judul_bab": bab.get("judul_bab"),
+                    "urutan": bab.get("urutan"),
+                }
+            )
+
+        pasal_list = []
+        for pasal in ai_result["pasal_list"]:
+            pasal_list.append(
+                {
+                    "peraturan_id": peraturan_id,
+                    "nomor_pasal": pasal.get("nomor_pasal"),
+                    "judul_pasal": pasal.get("judul_pasal"),
+                    "konten_pasal": pasal.get("konten_pasal"),
+                    "urutan": pasal.get("urutan"),
+                    "bab_id": None,
+                }
+            )
+
+        ayat_list = []
+        for ayat in ai_result["ayat_list"]:
+            ayat_list.append(
+                {
+                    "nomor_pasal": ayat.get("nomor_pasal"),
+                    "nomor_ayat": ayat.get("nomor_ayat"),
+                    "konten_ayat": ayat.get("konten_ayat"),
+                    "urutan": ayat.get("urutan"),
+                }
+            )
+
+        await bab_repository.delete_by_peraturan(peraturan_id)
+
+        # Save BABs and create mapping
+        bab_id_map = {}
+        for bab in bab_list:
+            bab_id = await bab_repository.create(bab)
+            bab_id_map[bab.get("nomor_bab")] = bab_id
+
+        # Save PASALs and create nomor_pasal -> pasal_id mapping
+        pasal_id_map = {}
+        for pasal in pasal_list:
+            pasal_id = await pasal_repository.create(pasal)
+            pasal_id_map[pasal.get("nomor_pasal")] = pasal_id
+
+        # Save AYATs with correct pasal_id
+        for ayat in ayat_list:
+            nomor_pasal = ayat.get("nomor_pasal")
+            pasal_id = pasal_id_map.get(nomor_pasal)
+            if pasal_id is None and pasal_id_map:
+                pasal_id = list(pasal_id_map.values())[0]
+
+            ayat_data = {
+                "pasal_id": pasal_id,
+                "nomor_ayat": ayat.get("nomor_ayat"),
+                "konten_ayat": ayat.get("konten_ayat"),
+                "urutan": ayat.get("urutan"),
+            }
+            await ayat_repository.create(ayat_data)
+
+        await peraturan_repository.update(
+            peraturan_id,
+            {
+                "parsed_at": datetime.now(),
+                "metadata": {
+                    **peraturan.get("metadata", {}),
+                    "bab_count": len(bab_list),
+                    "pasal_count": len(pasal_list),
+                    "ayat_count": len(ayat_list),
+                    "ai_confidence": ai_result.get("confidence", 0),
+                    "processing_time_seconds": processing_time,
+                    "ai_model": model,
+                },
+            },
+        )
+
+        _ai_parse_jobs[job_id]["status"] = "completed"
+        _ai_parse_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+        _ai_parse_jobs[job_id]["result"] = {
+            "success": True,
+            "peraturan_id": peraturan_id,
+            "bab_count": len(bab_list),
+            "pasal_count": len(pasal_list),
+            "ayat_count": len(ayat_list),
+            "confidence": ai_result.get("confidence", 0),
+            "processing_time_seconds": processing_time,
+        }
+
+        update_parse_status(
+            job_id=job_id,
+            is_running=False,
+            last_success=datetime.now(),
+            total_parsed=1,
+        )
+
+        logger.info(f"[{job_id}] AI parsing completed: {peraturan.get('judul')}")
+
+    except Exception as e:
+        _ai_parse_jobs[job_id]["status"] = "failed"
+        _ai_parse_jobs[job_id]["error"] = str(e)
+        _ai_parse_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+        logger.error(f"[{job_id}] AI parsing failed: {e}")
+
+
+async def run_ai_parse_from_url_task(
+    job_id: str,
+    pdf_url: str,
+    peraturan_id: str,
+    api_key: str,
+    peraturan_info: Dict[str, Any],
+    model: str,
+    concurrency: int,
+):
+    """Background task untuk AI parsing from URL"""
+    from parser.ai_agent import parse_pdf_with_ai
+    from parser.status import update_parse_status
+    import time
+
+    _ai_parse_jobs[job_id]["status"] = "running"
+    _ai_parse_jobs[job_id]["started_at"] = datetime.now().isoformat()
+
+    try:
+        update_parse_status(job_id=job_id, current_task=f"AI Parsing: {pdf_url}")
+
+        start_time = time.time()
+
+        ai_result = await parse_pdf_with_ai(
+            pdf_source=pdf_url,
+            api_key=api_key,
+            peraturan_info=peraturan_info,
+            model=model,
+            concurrency=concurrency,
+        )
+
+        processing_time = time.time() - start_time
+
+        _ai_parse_jobs[job_id]["status"] = "completed"
+        _ai_parse_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+        _ai_parse_jobs[job_id]["total_pages"] = ai_result["page_count"]
+        _ai_parse_jobs[job_id]["progress"] = 100
+        _ai_parse_jobs[job_id]["result"] = {
+            "success": True,
+            "peraturan_id": peraturan_id,
+            "bab_list": ai_result["bab_list"],
+            "pasal_list": ai_result["pasal_list"],
+            "ayat_list": ai_result["ayat_list"],
+            "full_text": ai_result["full_text"],
+            "page_count": ai_result["page_count"],
+            "confidence": ai_result["confidence"],
+            "processing_time_seconds": processing_time,
+        }
+
+        update_parse_status(
+            job_id=job_id,
+            is_running=False,
+            last_success=datetime.now(),
+            total_parsed=1,
+        )
+
+        logger.info(f"[{job_id}] AI parsing from URL completed")
+
+    except Exception as e:
+        _ai_parse_jobs[job_id]["status"] = "failed"
+        _ai_parse_jobs[job_id]["error"] = str(e)
+        _ai_parse_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+        logger.error(f"[{job_id}] AI parsing from URL failed: {e}")
+
+
+# ========================================
 # Helper Functions untuk Parsing
 # ========================================
 
 
 async def run_parse_task(request: ParseRequest, job_id: str):
-    """Background task untuk menjalankan parsing"""
+    """Background task untuk menjalankan AI parsing dengan GLM-4V"""
     from parser.status import (
         start_parsing,
         update_parse_status,
         update_progress,
-        increment_success_count,
-        increment_failure_count,
         finish_parsing,
     )
     from parser.scraper import scrape_peraturan
-    from parser.pdf_parser import parse_peraturan_complete, format_peraturan_data_for_db
+    from parser.ai_agent import parse_pdf_with_ai
     from repositories.peraturan import peraturan_repository
     from repositories.bab import bab_repository
     from repositories.pasal import pasal_repository
@@ -529,6 +964,11 @@ async def run_parse_task(request: ParseRequest, job_id: str):
             f"[{job_id}] Mulai parsing: {request.url if request.url else 'semua peraturan'}"
         )
 
+        # Get API key from environment
+        api_key = os.getenv("GLM_API_KEY")
+        if not api_key:
+            raise ValueError("GLM_API_KEY tidak ditemukan di environment variables")
+
         # 1. Scrape URLs dari peraturan.go.id
         urls = await scrape_peraturan(url=request.url, category=request.category, year=request.year)
 
@@ -540,7 +980,7 @@ async def run_parse_task(request: ParseRequest, job_id: str):
             finish_parsing(job_id=job_id, success=True)
             return
 
-        # 2. Download dan parse setiap PDF
+        # 2. Download dan parse setiap PDF dengan AI
         success_count = 0
         failed_count = 0
 
@@ -551,58 +991,123 @@ async def run_parse_task(request: ParseRequest, job_id: str):
                     current_task=f"Parsing {idx}/{len(urls)}: {url_info.get('judul', 'Unknown')}",
                 )
 
+                pdf_url = url_info.get("pdf_url")
+                if not pdf_url:
+                    logger.warning(f"[{job_id}] Tidak ada PDF URL untuk {url_info.get('judul')}")
+                    failed_count += 1
+                    continue
+
                 # Format data peraturan dari scraper
                 peraturan_data = {"id": generate_peraturan_id(url_info), **url_info}
+                peraturan_id = peraturan_data["id"]
 
-                # Download dan parse PDF
-                pdf_result = await parse_peraturan_complete(
-                    pdf_source=url_info.get("pdf_url"), peraturan_id=peraturan_data["id"]
+                logger.info(f"[{job_id}] Mengdownload PDF: {pdf_url}")
+
+                # AI-based parsing with GLM-4V
+                ai_result = await parse_pdf_with_ai(
+                    pdf_source=pdf_url,
+                    api_key=api_key,
+                    peraturan_info={
+                        "judul": url_info.get("judul"),
+                        "nomor": url_info.get("nomor"),
+                        "tahun": url_info.get("tahun"),
+                        "kategori": url_info.get("kategori"),
+                    },
+                    model=request.model,
+                    concurrency=request.concurrency,
                 )
 
-                # Format data untuk database
-                peraturan_final, bab_list, pasal_list, ayat_list = format_peraturan_data_for_db(
-                    peraturan_data=peraturan_data,
-                    bab_data=pdf_result["bab"],
-                    pasal_data=pdf_result["pasal"],
-                    ayat_data=pdf_result["ayat"],
-                )
+                # Prepare data for database
+                bab_list = [
+                    {
+                        "peraturan_id": peraturan_id,
+                        "nomor_bab": bab.get("nomor_bab"),
+                        "judul_bab": bab.get("judul_bab"),
+                        "urutan": bab.get("urutan"),
+                    }
+                    for bab in ai_result.get("bab_list", [])
+                ]
+
+                pasal_list = [
+                    {
+                        "peraturan_id": peraturan_id,
+                        "nomor_pasal": pasal.get("nomor_pasal"),
+                        "judul_pasal": pasal.get("judul_pasal"),
+                        "konten_pasal": pasal.get("konten_pasal"),
+                        "urutan": pasal.get("urutan"),
+                        "bab_id": None,
+                    }
+                    for pasal in ai_result.get("pasal_list", [])
+                ]
+
+                # Ayats have nomor_pasal reference, we'll map after inserting pasals
+                ayat_list = [
+                    {
+                        "nomor_pasal": ayat.get("nomor_pasal"),
+                        "nomor_ayat": ayat.get("nomor_ayat"),
+                        "konten_ayat": ayat.get("konten_ayat"),
+                        "urutan": ayat.get("urutan"),
+                    }
+                    for ayat in ai_result.get("ayat_list", [])
+                ]
+
+                peraturan_final = {
+                    **peraturan_data,
+                    "parsed_at": datetime.now(),
+                    "metadata": {
+                        "bab_count": len(bab_list),
+                        "pasal_count": len(pasal_list),
+                        "ayat_count": len(ayat_list),
+                        "page_count": ai_result.get("page_count", 0),
+                        "ai_confidence": ai_result.get("confidence", 0),
+                        "pages_processed": ai_result.get("pages_processed", 0),
+                        "ai_model": request.model,
+                    },
+                }
 
                 # Save peraturan
                 await peraturan_repository.create(peraturan_final)
 
-                # Save bab
+                # Delete old bab, pasal, ayat for this peraturan
+                await bab_repository.delete_by_peraturan(peraturan_id)
+
+                # Save BABs and create nomor_bab -> bab_id mapping
+                bab_id_map = {}
                 for bab in bab_list:
-                    await bab_repository.create(bab)
+                    bab_id = await bab_repository.create(bab)
+                    bab_id_map[bab.get("nomor_bab")] = bab_id
 
-                # Save pasal
+                # Save PASALs and create nomor_pasal -> pasal_id mapping
+                pasal_id_map = {}
                 for pasal in pasal_list:
-                    await pasal_repository.create(pasal)
+                    # Try to find bab_id from nomor_pasal pattern (if ayat mentions bab)
+                    pasal_id = await pasal_repository.create(pasal)
+                    pasal_id_map[pasal.get("nomor_pasal")] = pasal_id
 
-                # Save ayat
+                # Save AYATs with correct pasal_id
                 for ayat in ayat_list:
-                    await ayat_repository.create(ayat)
+                    nomor_pasal = ayat.get("nomor_pasal")
+                    # Find pasal_id from map, default to first pasal if not found
+                    pasal_id = pasal_id_map.get(nomor_pasal)
+                    if pasal_id is None and pasal_id_map:
+                        # If nomor_pasal is None or not found, use first pasal
+                        pasal_id = list(pasal_id_map.values())[0]
 
-                # Update parsed_at di peraturan
-                await peraturan_repository.update(
-                    peraturan_data["id"],
-                    {
-                        "parsed_at": datetime.now(),
-                        "metadata": {
-                            "bab_count": len(bab_list),
-                            "pasal_count": len(pasal_list),
-                            "ayat_count": len(ayat_list),
-                            "parse_duration": pdf_result.get("metadata", {}).get(
-                                "duration_seconds"
-                            ),
-                            "page_count": pdf_result.get("metadata", {}).get("page_count"),
-                        },
-                    },
-                )
+                    ayat_data = {
+                        "pasal_id": pasal_id,
+                        "nomor_ayat": ayat.get("nomor_ayat"),
+                        "konten_ayat": ayat.get("konten_ayat"),
+                        "urutan": ayat.get("urutan"),
+                    }
+                    await ayat_repository.create(ayat_data)
 
                 success_count += 1
                 update_progress(job_id=job_id, current=idx, total=len(urls))
 
-                logger.info(f"[{job_id}] Berhasil parse {idx}/{len(urls)}")
+                logger.info(
+                    f"[{job_id}] Berhasil parse {idx}/{len(urls)}: "
+                    f"{len(bab_list)} BAB, {len(pasal_list)} Pasal, {len(ayat_list)} Ayat"
+                )
 
             except Exception as e:
                 failed_count += 1

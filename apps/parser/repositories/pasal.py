@@ -6,6 +6,7 @@ CRUD operations untuk tabel pasal
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
+import json
 
 # Import db connection management
 from db import get_db_connection, execute_query, validate_identifier, sanitize_search_query
@@ -73,7 +74,7 @@ class PasalRepository:
                     pasal_data.get("judul_pasal"),
                     pasal_data.get("konten_pasal"),
                     pasal_data.get("urutan"),
-                    pasal_data.get("metadata", {}),
+                    pasal_data.get("metadata", json.dumps({})),
                 ),
                 fetch="val",
             )

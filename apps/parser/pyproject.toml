@@ -18,6 +18,7 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "lxml>=5.0.0",
     "aiofiles>=23.2.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]

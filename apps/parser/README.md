@@ -122,7 +122,7 @@ PORT=8000
 
 # Vision Model (GLM-4V)
 GLM_API_KEY=your-api-key
-GLM_MODEL=glm-4v-flash
+GLM_MODEL=glm-4v
 
 # Peraturan.go.id
 BASE_URL=https://peraturan.go.id
@@ -134,12 +134,81 @@ BASE_URL=https://peraturan.go.id
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/api/status` | Parsing status |
-| POST | `/api/parse` | Trigger parsing |
+| POST | `/api/parse` | Trigger traditional parsing |
+| POST | `/api/parse/ai` | Trigger AI-based parsing (GLM-4.6V) |
+| POST | `/api/parse/ai/url` | AI parse from PDF URL |
+| GET | `/api/parse/ai/status/{job_id}` | Get AI parsing job status |
+| GET | `/api/parse/ai/result/{job_id}` | Get AI parsing result |
 | GET | `/api/peraturan` | List peraturan |
 | GET | `/api/peraturan/{id}` | Get peraturan detail |
 | GET | `/api/peraturan/{id}/bab` | List bab |
 | GET | `/api/peraturan/{id}/pasals` | List pasal |
 | GET | `/api/peraturan/{id}/pasals/{pasal_id}/ayats` | List ayat |
+
+## AI-Based Parsing
+
+### Overview
+
+The parser service supports AI-based PDF parsing using GLM-4.6V vision model. This approach provides better accuracy for extracting structured data (BAB, Pasal, Ayat) from legal documents.
+
+### How It Works
+
+1. PDF pages are converted to high-quality images
+2. Each page image is sent to GLM-4.6V API for analysis
+3. The model extracts BAB, Pasal, and Ayat structures
+4. Results are merged and stored in the database
+
+### Usage
+
+#### Trigger AI Parsing for Existing Peraturan
+
+```bash
+curl -X POST "http://localhost:8000/api/parse/ai" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peraturan_id": "UU_1_2023_ABC123",
+    "api_key": "your_glm_api_key",
+    "model": "glm-4v",
+    "concurrency": 3,
+    "use_fallback": true
+  }'
+```
+
+#### Trigger AI Parsing from PDF URL
+
+```bash
+curl -X POST "http://localhost:8000/api/parse/ai/url" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdf_url": "https://example.com/document.pdf",
+    "api_key": "your_glm_api_key",
+    "judul": "Undang-Undang Republik Indonesia",
+    "nomor": "1",
+    "tahun": 2023,
+    "kategori": "UU"
+  }'
+```
+
+#### Check AI Parsing Status
+
+```bash
+curl "http://localhost:8000/api/parse/ai/status/{job_id}"
+```
+
+#### Get AI Parsing Result
+
+```bash
+curl "http://localhost:8000/api/parse/ai/result/{job_id}"
+```
+
+### Fallback Mechanism
+
+When AI parsing fails, the system automatically falls back to traditional text-based parsing if `use_fallback=true`. This ensures reliability even when the vision model encounters issues.
+
+### Models Available
+
+- `glm-4v` - Vision model (recommended)
+- `glm-4v-plus` - More powerful vision model
 
 ## Development
 
@@ -157,9 +226,11 @@ apps/parser/
 │   ├── peraturan.py           # Peraturan model
 │   ├── bab.py                 # Bab model
 │   ├── pasal.py               # Pasal model
-│   └── ayat.py                # Ayat model
+│   ├── ayat.py                # Ayat model
+│   └── ai_parse.py            # AI parsing models
 ├── parser/
 │   ├── pdf_parser.py          # PDF parsing logic
+│   ├── ai_agent.py            # GLM-4.6V vision model integration
 │   ├── scraper.py             # Web scraping logic
 │   └── status.py              # Status management
 ├── repositories/

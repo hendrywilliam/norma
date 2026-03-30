@@ -135,7 +135,7 @@ def pdf_pages_to_base64(
     Convert PDF pages to base64 encoded images (in-memory)
 
     Args:
-        pdf_source: PDF file path, bytes, or file-like object
+        pdf_source: PDF file path, URL, bytes, or file-like object
         scale: Scale factor for image quality (default: 2.0)
         image_format: Image format (png, jpeg, etc.)
 
@@ -151,8 +151,19 @@ def pdf_pages_to_base64(
     try:
         if isinstance(pdf_source, bytes):
             doc = fitz.open(stream=pdf_source, filetype="pdf")
-        elif isinstance(pdf_source, str) and os.path.exists(pdf_source):
-            doc = fitz.open(pdf_source)
+        elif isinstance(pdf_source, str):
+            if pdf_source.startswith(("http://", "https://")):
+                import requests
+
+                response = requests.get(pdf_source, timeout=60)
+                response.raise_for_status()
+                pdf_bytes = response.content
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                logger.info(f"Downloaded PDF from URL: {len(pdf_bytes)} bytes")
+            elif os.path.exists(pdf_source):
+                doc = fitz.open(pdf_source)
+            else:
+                raise ValueError(f"PDF source must be a valid file path or URL: {pdf_source}")
         else:
             doc = fitz.open(stream=pdf_source.read(), filetype="pdf")
 
@@ -765,8 +776,6 @@ async def parse_peraturan_complete(
         if convert_to_images and parse_result.get("images"):
             result["images"] = parse_result["images"]
             result["image_dir"] = parse_result.get("image_dir")
-
-        logger.info(result)
 
         logger.info(f"Complete parsing finished: {result['parse_stats']}")
         return result
