@@ -58,10 +58,40 @@ export interface Ayat {
   updated_at: string;
 }
 
+export interface AyatNode {
+  id: number;
+  nomor_ayat: string;
+  konten_ayat: string;
+  urutan: number;
+}
+
+export interface PasalNode {
+  id: number;
+  nomor_pasal: string;
+  judul_pasal: string | null;
+  konten_pasal: string;
+  urutan: number;
+  ayat_list: AyatNode[];
+}
+
+export interface BabNode {
+  id: number;
+  nomor_bab: string;
+  judul_bab: string | null;
+  urutan: number;
+  pasal_list: PasalNode[];
+}
+
 export interface PeraturanDetail extends Peraturan {
   bab_list: Bab[];
   pasal_list: Pasal[];
   ayat_list: Ayat[];
+}
+
+export interface PeraturanTreeResponse {
+  peraturan: PeraturanDetail;
+  bab_list: BabNode[];
+  pasal_tanpa_bab_list: PasalNode[];
 }
 
 export interface ApiResponse<T> {

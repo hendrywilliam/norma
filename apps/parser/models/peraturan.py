@@ -14,7 +14,9 @@ class PeraturanBase(BaseModel):
     judul: Optional[str] = Field(None, min_length=1, description="Judul peraturan")
     nomor: str = Field(..., min_length=1, description="Nomor peraturan")
     tahun: int = Field(..., gt=1900, lt=2100, description="Tahun peraturan")
-    kategori: str = Field(..., min_length=1, description="Kategori peraturan (UU, PP, Perpres, dll)")
+    kategori: str = Field(
+        ..., min_length=1, description="Kategori peraturan (UU, PP, Perpres, dll)"
+    )
     url: str = Field(..., min_length=1, description="URL sumber dari peraturan.go.id")
     pdf_url: Optional[str] = Field(None, description="URL PDF peraturan")
     jenis_peraturan: Optional[str] = Field(None, description="Jenis peraturan lengkap")
@@ -27,25 +29,40 @@ class PeraturanBase(BaseModel):
     jumlah_dilihat: Optional[int] = Field(0, ge=0, description="Jumlah dilihat")
     jumlah_download: Optional[int] = Field(0, ge=0, description="Jumlah didownload")
     tanggal_disahkan: Optional[datetime] = Field(None, description="Tanggal peraturan disahkan")
-    tanggal_diundangkan: Optional[datetime] = Field(None, description="Tanggal peraturan diundangkan")
+    tanggal_diundangkan: Optional[datetime] = Field(
+        None, description="Tanggal peraturan diundangkan"
+    )
     deskripsi: Optional[str] = Field(None, description="Deskripsi singkat peraturan")
 
-    @field_validator('kategori')
+    @field_validator("kategori")
     @classmethod
     def validate_kategori(cls, v):
         """Validasi kategori peraturan"""
-        kategori_valid = ['UU', 'PP', 'Perpres', 'Permen', 'Perpuu', 'Tap MPR', 'UU MD3',
-                         'PPA', 'Perbup', 'Perwal', 'Perda', 'Perwali', 'Lainnya']
+        kategori_valid = [
+            "UU",
+            "PP",
+            "Perpres",
+            "Permen",
+            "Perpuu",
+            "Tap MPR",
+            "UU MD3",
+            "PPA",
+            "Perbup",
+            "Perwal",
+            "Perda",
+            "Perwali",
+            "Lainnya",
+        ]
         if v not in kategori_valid:
-            raise ValueError(f'Kategori harus salah dari: {", ".join(kategori_valid)}')
+            raise ValueError(f"Kategori harus salah dari: {', '.join(kategori_valid)}")
         return v
 
-    @field_validator('url', 'pdf_url')
+    @field_validator("url", "pdf_url")
     @classmethod
     def validate_url(cls, v):
         """Validasi URL format"""
-        if v and not (v.startswith('http://') or v.startswith('https://')):
-            raise ValueError('URL harus dimulai dengan http:// atau https://')
+        if v and not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URL harus dimulai dengan http:// atau https://")
         return v
 
 
@@ -157,14 +174,22 @@ class PeraturanFilter(BaseModel):
     sort_by: Optional[str] = Field(None, description="Field untuk sorting")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Urutan sorting")
 
-    @field_validator('sort_by')
+    @field_validator("sort_by")
     @classmethod
     def validate_sort_by(cls, v):
         """Validasi field yang bisa di-sort"""
         if v:
-            sort_fields = ['judul', 'nomor', 'tahun', 'kategori', 'created_at', 'updated_at', 'parsed_at']
+            sort_fields = [
+                "judul",
+                "nomor",
+                "tahun",
+                "kategori",
+                "created_at",
+                "updated_at",
+                "parsed_at",
+            ]
             if v not in sort_fields:
-                raise ValueError(f'Sort by harus salah dari: {", ".join(sort_fields)}')
+                raise ValueError(f"Sort by harus salah dari: {', '.join(sort_fields)}")
         return v
 
 
@@ -212,3 +237,69 @@ class PeraturanFullResponse(BaseModel):
     pasal_count: int = Field(0, description="Total pasal")
     ayat_count: int = Field(0, description="Total ayat")
     # Note: Lists are extended in routes.py for full response with nested items
+
+
+class AyatNode(BaseModel):
+    """Model untuk ayat dalam struktur tree"""
+
+    id: int = Field(..., description="ID ayat")
+    nomor_ayat: str = Field(..., description="Nomor ayat")
+    konten_ayat: str = Field(..., description="Konten ayat")
+    urutan: int = Field(..., description="Urutan ayat")
+
+    class Config:
+        from_attributes = True
+
+
+class PasalNode(BaseModel):
+    """Model untuk pasal dalam struktur tree"""
+
+    id: int = Field(..., description="ID pasal")
+    nomor_pasal: str = Field(..., description="Nomor pasal")
+    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
+    konten_pasal: str = Field(..., description="Konten pasal")
+    urutan: int = Field(..., description="Urutan pasal")
+    ayat_list: List["AyatNode"] = Field(default_factory=list, description="List ayat dalam pasal")
+
+    class Config:
+        from_attributes = True
+
+
+class BabNode(BaseModel):
+    """Model untuk bab dalam struktur tree"""
+
+    id: int = Field(..., description="ID bab")
+    nomor_bab: str = Field(..., description="Nomor bab")
+    judul_bab: Optional[str] = Field(None, description="Judul bab")
+    urutan: int = Field(..., description="Urutan bab")
+    pasal_list: List["PasalNode"] = Field(default_factory=list, description="List pasal dalam bab")
+
+    class Config:
+        from_attributes = True
+
+
+class PeraturanTreeResponse(BaseModel):
+    """Model untuk response peraturan dengan struktur tree (nested)
+
+    Struktur tree:
+    - Peraturan
+      ├── bab_list: List[BabNode]
+      │   └── BabNode
+      │       └── pasal_list: List[PasalNode]
+      │           └── PasalNode
+      │               └── ayat_list: List[AyatNode]
+      └── pasal_tanpa_bab_list: List[PasalNode]
+          └── PasalNode
+              └── ayat_list: List[AyatNode]
+    """
+
+    peraturan: PeraturanDetail
+    bab_list: List[BabNode] = Field(
+        default_factory=list, description="List bab dengan pasal nested"
+    )
+    pasal_tanpa_bab_list: List[PasalNode] = Field(
+        default_factory=list, description="List pasal tanpa bab (standalone)"
+    )
+
+    class Config:
+        from_attributes = True

@@ -26,7 +26,14 @@ class AyatRepository:
         Create ayat baru di database
 
         Args:
-            ayat_data: Dictionary data ayat
+            ayat_data: Dictionary data ayat dengan:
+                - nomor_ayat: str
+                - konten_ayat: str
+                - urutan: int
+                - pasal_id: int
+                - bab_id: Optional[int]
+                - peraturan_id: Optional[str]
+                - metadata: Optional[dict]
 
         Returns:
             ID ayat yang dibuat
@@ -36,13 +43,15 @@ class AyatRepository:
         """
         insert_query = """
         INSERT INTO ayats (
-            nomor_ayat, konten_ayat, urutan, metadata, pasal_id
+            nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (pasal_id, nomor_ayat) DO UPDATE SET
             konten_ayat = EXCLUDED.konten_ayat,
             urutan = EXCLUDED.urutan,
             metadata = EXCLUDED.metadata,
+            bab_id = EXCLUDED.bab_id,
+            peraturan_id = EXCLUDED.peraturan_id,
             updated_at = CURRENT_TIMESTAMP
         RETURNING id
         """
@@ -56,6 +65,8 @@ class AyatRepository:
                     ayat_data.get("urutan"),
                     ayat_data.get("metadata", json.dumps({})),
                     ayat_data.get("pasal_id"),
+                    ayat_data.get("bab_id"),
+                    ayat_data.get("peraturan_id"),
                 ),
                 fetch="val",
             )
@@ -79,7 +90,7 @@ class AyatRepository:
             Dictionary data ayat atau None jika tidak ditemukan
         """
         select_query = """
-        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id,
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
                created_at, updated_at
         FROM ayats
         WHERE id = $1
@@ -102,7 +113,7 @@ class AyatRepository:
             List dari ayat dictionaries
         """
         select_query = """
-        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id,
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
                created_at, updated_at
         FROM ayats
         WHERE pasal_id = $1
@@ -114,10 +125,10 @@ class AyatRepository:
         return result if result else []
 
     async def get_list_by_peraturan(
-        self, peraturan_id: str, skip: int = 0, limit: int = 100
+        self, peraturan_id: str, skip: int = 0, limit: int = 10000
     ) -> List[Dict[str, Any]]:
         """
-        Get list ayat untuk peraturan spesifik
+        Get list ayat untuk peraturan spesifik (menggunakan peraturan_id yang sudah di-denormalize)
 
         Args:
             peraturan_id: ID peraturan
@@ -128,38 +139,42 @@ class AyatRepository:
             List dari ayat dictionaries
         """
         select_query = """
-        SELECT a.id, a.nomor_ayat, a.konten_ayat, a.urutan, a.metadata, a.pasal_id,
-               a.created_at, a.updated_at
-        FROM ayats a
-        JOIN pasals p ON a.pasal_id = p.id
-        WHERE p.peraturan_id = $1
-        ORDER BY a.pasal_id, a.urutan ASC
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
+               created_at, updated_at
+        FROM ayats
+        WHERE peraturan_id = $1
+        ORDER BY urutan ASC
         LIMIT $2 OFFSET $3
         """
 
         result = await execute_query(select_query, args=(peraturan_id, limit, skip), fetch="all")
         return result if result else []
 
-    async def delete(self, ayat_id: int) -> bool:
+    async def get_list_by_bab(
+        self, bab_id: int, skip: int = 0, limit: int = 1000
+    ) -> List[Dict[str, Any]]:
         """
-        Delete ayat
+        Get list ayat untuk bab spesifik
 
         Args:
-            ayat_id: ID ayat
+            bab_id: ID bab
+            skip: Offset untuk pagination
+            limit: Limit hasil per page
 
         Returns:
-            True jika berhasil, False jika tidak
+            List dari ayat dictionaries
         """
-        delete_query = "DELETE FROM ayats WHERE id = $1"
+        select_query = """
+        SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
+               created_at, updated_at
+        FROM ayats
+        WHERE bab_id = $1
+        ORDER BY urutan ASC
+        LIMIT $2 OFFSET $3
+        """
 
-        try:
-            result = await execute_query(delete_query, args=(ayat_id,), fetch="exec")
-            affected_rows = result if isinstance(result, int) else 0
-            logger.info(f"Deleted ayat {ayat_id}: {affected_rows} rows")
-            return affected_rows > 0
-        except Exception as e:
-            logger.error(f"Failed to delete ayat {ayat_id}: {e}")
-            return False
+        result = await execute_query(select_query, args=(bab_id, limit, skip), fetch="all")
+        return result if result else []
 
 
 # Singleton repository instance

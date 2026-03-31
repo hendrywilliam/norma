@@ -123,3 +123,69 @@ class AIBatchParseResult(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AyatParsedNode(BaseModel):
+    """Model untuk ayat yang di-parse oleh AI"""
+
+    nomor_ayat: str = Field(..., description="Nomor ayat ((1), (2), dst)")
+    konten_ayat: str = Field(..., description="Konten ayat")
+    urutan: int = Field(..., description="Urutan ayat dalam pasal")
+
+
+class PasalParsedNode(BaseModel):
+    """Model untuk pasal yang di-parse oleh AI"""
+
+    nomor_pasal: str = Field(..., description="Nomor pasal")
+    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
+    konten_pasal: str = Field(..., description="Konten pasal")
+    urutan: int = Field(..., description="Urutan pasal dalam peraturan")
+    ayat_list: List[AyatParsedNode] = Field(
+        default_factory=list, description="List ayat dalam pasal"
+    )
+
+
+class BabParsedNode(BaseModel):
+    """Model untuk bab yang di-parse oleh AI"""
+
+    nomor_bab: str = Field(..., description="Nomor bab (I, II, III, dst)")
+    judul_bab: Optional[str] = Field(None, description="Judul bab")
+    urutan: int = Field(..., description="Urutan bab dalam peraturan")
+    pasal_list: List[PasalParsedNode] = Field(
+        default_factory=list, description="List pasal dalam bab"
+    )
+
+
+class AIParseTreeResult(BaseModel):
+    """Result model for AI parsing dengan struktur tree (nested)
+
+    Struktur tree:
+    - Peraturan
+      ├── bab_list: List[BabParsedNode]
+      │   └── BabParsedNode
+      │       └── pasal_list: List[PasalParsedNode]
+      │           └── PasalParsedNode
+      │               └── ayat_list: List[AyatParsedNode]
+      └── pasal_tanpa_bab_list: List[PasalParsedNode]
+          └── PasalParsedNode
+              └── ayat_list: List[AyatParsedNode]
+    """
+
+    success: bool = Field(..., description="Whether parsing was successful")
+    peraturan_id: str = Field(..., description="ID of the peraturan")
+    bab_list: List[BabParsedNode] = Field(
+        default_factory=list, description="List bab dengan pasal nested"
+    )
+    pasal_tanpa_bab_list: List[PasalParsedNode] = Field(
+        default_factory=list, description="List pasal tanpa bab (standalone)"
+    )
+    full_text: str = Field("", description="Full text extracted from all pages")
+    page_count: int = Field(0, description="Total number of pages processed")
+    pages_processed: int = Field(0, description="Number of pages successfully processed")
+    confidence: float = Field(0.0, ge=0.0, le=1.0, description="Average confidence score")
+    processing_time_seconds: float = Field(0.0, description="Total processing time in seconds")
+    used_fallback: bool = Field(False, description="Whether fallback parsing was used")
+    error: Optional[str] = Field(None, description="Error message if parsing failed")
+
+    class Config:
+        from_attributes = True

@@ -12,10 +12,15 @@ from datetime import datetime
 # Models untuk Ayat
 # ========================================
 
+
 class AyatBase(BaseModel):
     """Base model untuk Ayat"""
 
     pasal_id: int = Field(..., description="Foreign key ke tabel pasals")
+    bab_id: Optional[int] = Field(None, description="Foreign key ke tabel bab (denormalized)")
+    peraturan_id: Optional[str] = Field(
+        None, description="Foreign key ke tabel peraturan (denormalized)"
+    )
     nomor_ayat: str = Field(..., min_length=1, description="Nomor ayat ((1), (2), (3), dll)")
     konten_ayat: str = Field(..., min_length=1, description="Konten ayat")
     urutan: int = Field(..., ge=0, description="Urutan ayat dalam pasal")
@@ -79,8 +84,6 @@ class AyatWithPasalBabPeraturan(AyatResponse):
     nomor_bab: Optional[str] = Field(None, description="Nomor bab")
     judul_bab: Optional[str] = Field(None, description="Judul bab")
     bab_urutan: Optional[int] = Field(None, description="Urutan bab")
-    pasal_id: Optional[int] = Field(None, description="ID pasal (dari query)")
-    peraturan_id: str = Field(..., description="ID peraturan")
     judul_peraturan: Optional[str] = Field(None, description="Judul peraturan")
     nomor_peraturan: str = Field(..., description="Nomor peraturan")
     tahun_peraturan: int = Field(..., description="Tahun peraturan")
@@ -92,6 +95,7 @@ class AyatWithPasalBabPeraturan(AyatResponse):
 # ========================================
 # Models untuk List dan Filter
 # ========================================
+
 
 class AyatListResponse(BaseModel):
     """Model untuk list ayat response"""
@@ -110,12 +114,24 @@ class AyatFilter(BaseModel):
     sort_by: Optional[str] = Field(None, description="Field untuk sorting")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Urutan sorting")
 
-    @field_validator('sort_by')
+    @field_validator("sort_by")
     @classmethod
     def validate_sort_by(cls, v):
         """Validasi field yang bisa di-sort"""
         if v:
-            sort_fields = ['nomor_ayat', 'konten_ayat', 'urutan', 'created_at', 'updated_at']
+            sort_fields = ["nomor_ayat", "konten_ayat", "urutan", "created_at", "updated_at"]
             if v not in sort_fields:
-                raise ValueError(f'Sort by harus salah dari: {", ".join(sort_fields)}')
+                raise ValueError(f"Sort by harus salah dari: {', '.join(sort_fields)}")
         return v
+
+
+class AyatNode(BaseModel):
+    """Model untuk ayat dalam struktur tree (nested dalam pasal)"""
+
+    id: int = Field(..., description="ID ayat")
+    nomor_ayat: str = Field(..., description="Nomor ayat")
+    konten_ayat: str = Field(..., description="Konten ayat")
+    urutan: int = Field(..., description="Urutan ayat")
+
+    class Config:
+        from_attributes = True

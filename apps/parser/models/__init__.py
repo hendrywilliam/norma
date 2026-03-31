@@ -15,6 +15,10 @@ from .peraturan import (
     PeraturanMetadata,
     ParseResult,
     PeraturanFullResponse,
+    AyatNode,
+    PasalNode,
+    BabNode,
+    PeraturanTreeResponse,
 )
 
 from .bab import (
@@ -62,6 +66,10 @@ from .ai_parse import (
     AIBatchParseRequest,
     AIBatchParseResult,
     GLMConfigModel,
+    AyatParsedNode,
+    PasalParsedNode,
+    BabParsedNode,
+    AIParseTreeResult,
 )
 
 __all__ = [
@@ -78,6 +86,11 @@ __all__ = [
     "PeraturanMetadata",
     "ParseResult",
     "PeraturanFullResponse",
+    # Tree structure models
+    "AyatNode",
+    "PasalNode",
+    "BabNode",
+    "PeraturanTreeResponse",
     # Bab
     "BabBase",
     "BabCreate",
@@ -117,4 +130,9 @@ __all__ = [
     "AIBatchParseRequest",
     "AIBatchParseResult",
     "GLMConfigModel",
+    # AI Parse Tree Models
+    "AyatParsedNode",
+    "PasalParsedNode",
+    "BabParsedNode",
+    "AIParseTreeResult",
 ]

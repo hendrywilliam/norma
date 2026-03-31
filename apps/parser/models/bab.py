@@ -12,6 +12,7 @@ from datetime import datetime
 # Models untuk Bab
 # ========================================
 
+
 class BabBase(BaseModel):
     """Base model untuk Bab"""
 
@@ -72,6 +73,7 @@ class BabWithPeraturanInfo(BabResponse):
 # Models untuk List dan Filter
 # ========================================
 
+
 class BabListResponse(BaseModel):
     """Model untuk list bab response"""
 
@@ -85,3 +87,42 @@ class BabFilter(BaseModel):
 
     skip: int = Field(0, ge=0, description="Offset untuk pagination")
     limit: int = Field(50, ge=1, le=100, description="Limit hasil per page")
+
+
+class AyatNode(BaseModel):
+    """Model untuk ayat dalam struktur tree"""
+
+    id: int = Field(..., description="ID ayat")
+    nomor_ayat: str = Field(..., description="Nomor ayat")
+    konten_ayat: str = Field(..., description="Konten ayat")
+    urutan: int = Field(..., description="Urutan ayat")
+
+    class Config:
+        from_attributes = True
+
+
+class PasalNode(BaseModel):
+    """Model untuk pasal dalam struktur tree"""
+
+    id: int = Field(..., description="ID pasal")
+    nomor_pasal: str = Field(..., description="Nomor pasal")
+    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
+    konten_pasal: str = Field(..., description="Konten pasal")
+    urutan: int = Field(..., description="Urutan pasal")
+    ayat_list: List[AyatNode] = Field(default_factory=list, description="List ayat dalam pasal")
+
+    class Config:
+        from_attributes = True
+
+
+class BabNode(BaseModel):
+    """Model untuk bab dalam struktur tree (nested dalam peraturan)"""
+
+    id: int = Field(..., description="ID bab")
+    nomor_bab: str = Field(..., description="Nomor bab")
+    judul_bab: Optional[str] = Field(None, description="Judul bab")
+    urutan: int = Field(..., description="Urutan bab")
+    pasal_list: List[PasalNode] = Field(default_factory=list, description="List pasal dalam bab")
+
+    class Config:
+        from_attributes = True

@@ -12,6 +12,7 @@ from datetime import datetime
 # Models untuk Pasal
 # ========================================
 
+
 class PasalBase(BaseModel):
     """Base model untuk Pasal"""
 
@@ -84,6 +85,7 @@ class PasalWithBabPeraturan(PasalResponse):
 # Models untuk List dan Filter
 # ========================================
 
+
 class PasalListResponse(BaseModel):
     """Model untuk list pasal response"""
 
@@ -103,12 +105,45 @@ class PasalFilter(BaseModel):
     sort_by: Optional[str] = Field(None, description="Field untuk sorting")
     sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Urutan sorting")
 
-    @field_validator('sort_by')
+    @field_validator("sort_by")
     @classmethod
     def validate_sort_by(cls, v):
         """Validasi field yang bisa di-sort"""
         if v:
-            sort_fields = ['nomor_pasal', 'judul_pasal', 'konten_pasal', 'urutan', 'created_at', 'updated_at']
+            sort_fields = [
+                "nomor_pasal",
+                "judul_pasal",
+                "konten_pasal",
+                "urutan",
+                "created_at",
+                "updated_at",
+            ]
             if v not in sort_fields:
-                raise ValueError(f'Sort by harus salah dari: {", ".join(sort_fields)}')
+                raise ValueError(f"Sort by harus salah dari: {', '.join(sort_fields)}")
         return v
+
+
+class AyatNode(BaseModel):
+    """Model untuk ayat dalam struktur tree"""
+
+    id: int = Field(..., description="ID ayat")
+    nomor_ayat: str = Field(..., description="Nomor ayat")
+    konten_ayat: str = Field(..., description="Konten ayat")
+    urutan: int = Field(..., description="Urutan ayat")
+
+    class Config:
+        from_attributes = True
+
+
+class PasalNode(BaseModel):
+    """Model untuk pasal dalam struktur tree (nested dalam bab atau peraturan)"""
+
+    id: int = Field(..., description="ID pasal")
+    nomor_pasal: str = Field(..., description="Nomor pasal")
+    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
+    konten_pasal: str = Field(..., description="Konten pasal")
+    urutan: int = Field(..., description="Urutan pasal")
+    ayat_list: List[AyatNode] = Field(default_factory=list, description="List ayat dalam pasal")
+
+    class Config:
+        from_attributes = True

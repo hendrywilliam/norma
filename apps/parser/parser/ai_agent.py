@@ -63,28 +63,39 @@ class GLM46VAgent:
         previous_babs = context.get("previous_babs", [])
         previous_pasals = context.get("previous_pasals", [])
         peraturan_info = context.get("peraturan_info", {})
+        current_bab = context.get("current_bab")
 
         prompt = """You are a legal document parser for Indonesian regulations (peraturan). Analyze this PDF page image and extract the structure.
 
 CRITICAL INSTRUCTIONS:
 1. Extract ALL BAB (chapters) visible on this page
-2. Extract ALL Pasal (articles) visible on this page
+2. Extract ALL Pasal (articles) visible on this page - IMPORTANT: Track which BAB each pasal belongs to
 3. Extract ALL Ayat (paragraphs) visible on this page
 
 EXTRACTION RULES:
 - BAB format: "BAB I", "BAB II", etc. or "Bagian 1", "Bagian 2", etc.
 - Each BAB has a judul_bab (title)
 - Pasal format: "Pasal 1", "Pasal 2", etc.
-- Each Pasal has konten_pasal (content)
+- Each Pasal has konten_pasal (content) and MUST include nomor_bab to indicate which BAB it belongs to
+- If a pasal appears after a BAB heading, it belongs to that BAB
+- If no BAB heading appears on this page but pasals appear, they belong to the LAST BAB from previous pages
 - Ayat format: "(1)", "(2)", "(3)", etc. followed by content
 - Each ayat has nomor_ayat and konten_ayat
-
-CONTEXT FROM PREVIOUS PAGES:
+"""
+        if current_bab:
+            prompt += f"""
+CURRENT BAB CONTEXT (from previous pages):
+The current active BAB is: "{current_bab}"
+All pasals on this page that don't have an explicit BAB heading should have nomor_bab = "{current_bab}"
 """
         if previous_babs:
-            prompt += f"Previous BABs: {json.dumps(previous_babs[-3:], ensure_ascii=False)}\n"
+            prompt += (
+                f"\nPrevious BABs found: {json.dumps(previous_babs[-5:], ensure_ascii=False)}\n"
+            )
         if previous_pasals:
-            prompt += f"Previous Pasals: {json.dumps(previous_pasals[-3:], ensure_ascii=False)}\n"
+            prompt += (
+                f"Previous Pasals found: {json.dumps(previous_pasals[-3:], ensure_ascii=False)}\n"
+            )
         if peraturan_info:
             prompt += f"Regulation: {peraturan_info.get('judul', 'Unknown')} - {peraturan_info.get('nomor', 'Unknown')}\n"
 
@@ -103,6 +114,7 @@ OUTPUT FORMAT (JSON ONLY, NO MARKDOWN):
             "nomor_pasal": "1",
             "judul_pasal": "",
             "konten_pasal": "Full pasal content...",
+            "nomor_bab": "I",
             "urutan": 1
         }
     ],
@@ -124,6 +136,10 @@ IMPORTANT:
 - Extract ALL text visible in the image as raw_text
 - Confidence should be between 0.0 and 1.0
 - Maintain correct urutan (sequence) numbers
+- CRITICAL: Every pasal MUST have nomor_bab field
+- If a pasal is under a BAB heading, put that BAB number
+- If no BAB heading on page but current BAB exists from context, use that
+- Track BAB context: when you see "BAB I", all subsequent pasals belong to "BAB I" until "BAB II" appears
 """
         return prompt
 
@@ -235,30 +251,42 @@ IMPORTANT:
         peraturan_info: Optional[Dict[str, Any]] = None,
         concurrency: int = 3,
     ) -> List[ParsedPage]:
-        results = []
         previous_babs: List[Dict[str, Any]] = []
         previous_pasals: List[Dict[str, Any]] = []
+        current_bab_container: List[Optional[str]] = [None]
 
         semaphore = asyncio.Semaphore(concurrency)
+        state_lock = asyncio.Lock()
 
         async def parse_with_semaphore(page_data: Dict[str, Any], idx: int) -> ParsedPage:
             async with semaphore:
-                context = {
-                    "previous_babs": previous_babs.copy(),
-                    "previous_pasals": previous_pasals.copy(),
-                    "peraturan_info": peraturan_info or {},
-                }
+                async with state_lock:
+                    context = {
+                        "previous_babs": previous_babs.copy(),
+                        "previous_pasals": previous_pasals.copy(),
+                        "peraturan_info": peraturan_info or {},
+                        "current_bab": current_bab_container[0],
+                    }
 
+            try:
                 result = await self.parse_page_image(
                     image_base64=page_data["image_b64"],
                     page_number=page_data["page"],
                     context=context,
                 )
 
-                previous_babs.extend(result.bab_list)
-                previous_pasals.extend(result.pasal_list)
+                async with state_lock:
+                    previous_babs.extend(result.bab_list)
+                    previous_pasals.extend(result.pasal_list)
+
+                    for bab in result.bab_list:
+                        if bab.get("nomor_bab"):
+                            current_bab_container[0] = bab["nomor_bab"]
 
                 return result
+            except Exception as e:
+                logger.error(f"Error parsing page {page_data.get('page', idx)}: {e}")
+                raise
 
         tasks = [parse_with_semaphore(page, idx) for idx, page in enumerate(pages)]
 
@@ -267,8 +295,7 @@ IMPORTANT:
         final_results = []
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(Exception)
-                logger.error(f"Failed to parse page {idx + 1}: {result}")
+                logger.error(f"Failed to parse page {idx + 1}: {type(result).__name__}: {result}")
                 final_results.append(
                     ParsedPage(
                         page_number=idx + 1,
@@ -338,6 +365,8 @@ async def parse_pdf_with_ai(
     seen_babs: set = set()
     seen_pasals: set = set()
 
+    current_bab: Optional[str] = None
+
     for page in parsed_pages:
         all_text.append(page.raw_text)
         total_confidence += page.confidence
@@ -354,18 +383,21 @@ async def parse_pdf_with_ai(
                         "urutan": bab_urutan,
                     }
                 )
+            current_bab = bab_key
 
         for pasal in page.pasal_list:
             pasal_key = pasal.get("nomor_pasal", "")
             if pasal_key and pasal_key not in seen_pasals:
                 pasal_urutan += 1
                 seen_pasals.add(pasal_key)
+                pasal_bab = pasal.get("nomor_bab") or current_bab
                 all_pasals.append(
                     {
                         "nomor_pasal": pasal_key,
                         "judul_pasal": pasal.get("judul_pasal", ""),
                         "konten_pasal": pasal.get("konten_pasal", ""),
                         "urutan": pasal_urutan,
+                        "nomor_bab": pasal_bab,
                     }
                 )
 
@@ -390,4 +422,86 @@ async def parse_pdf_with_ai(
         "page_count": len(pages),
         "confidence": avg_confidence,
         "pages_processed": len(parsed_pages),
+    }
+
+
+def build_tree_from_parse_result(parse_result: Dict[str, Any]) -> Dict[str, Any]:
+    """Build tree structure from flat parse result
+
+    Args:
+        parse_result: Dictionary with bab_list, pasal_list, ayat_list
+
+    Returns:
+        Dictionary with bab_list (tree), pasal_tanpa_bab_list (tree)tree structure for AI result"""
+    bab_list = parse_result.get("bab_list", [])
+    pasal_list = parse_result.get("pasal_list", [])
+    ayat_list = parse_result.get("ayat_list", [])
+
+    ayat_by_pasal: Dict[str, List[Dict[str, Any]]] = {}
+    for ayat in ayat_list:
+        nomor_pasal = ayat.get("nomor_pasal", "")
+        if nomor_pasal not in ayat_by_pasal:
+            ayat_by_pasal[nomor_pasal] = []
+        ayat_by_pasal[nomor_pasal].append(ayat)
+
+    pasal_by_nomor: Dict[str, Dict[str, Any]] = {}
+    for pasal in pasal_list:
+        nomor_pasal = pasal.get("nomor_pasal", "")
+        pasal_by_nomor[nomor_pasal] = pasal
+
+    bab_by_nomor: Dict[str, Dict[str, Any]] = {}
+    for bab in bab_list:
+        nomor_bab = bab.get("nomor_bab", "")
+        bab_by_nomor[nomor_bab] = bab
+
+    def build_ayat_nodes(nomor_pasal: str, ayat_by_pasal_map: Dict) -> List[Dict[str, Any]]:
+        """Build ayat nodes for a pasal"""
+        ayats = ayat_by_pasal_map.get(nomor_pasal, [])
+        return [
+            {
+                "nomor_ayat": ayat.get("nomor_ayat", ""),
+                "konten_ayat": ayat.get("konten_ayat", ""),
+                "urutan": ayat.get("urutan", 0),
+            }
+            for ayat in sorted(ayats, key=lambda x: x.get("urutan", 0))
+        ]
+
+    def build_pasal_node(pasal: Dict[str, Any]) -> Dict[str, Any]:
+        """Build pasal node with ayat_list"""
+        return {
+            "nomor_pasal": pasal.get("nomor_pasal", ""),
+            "judul_pasal": pasal.get("judul_pasal"),
+            "konten_pasal": pasal.get("konten_pasal", ""),
+            "urutan": pasal.get("urutan", 0),
+            "ayat_list": build_ayat_nodes(pasal.get("nomor_pasal", ""), ayat_by_pasal),
+        }
+
+    bab_nodes = []
+    for bab in sorted(bab_list, key=lambda x: x.get("urutan", 0)):
+        nomor_bab = bab.get("nomor_bab", "")
+        bab_pasals = [
+            build_pasal_node(pasal) for pasal in pasal_list if pasal.get("bab_nomor") == nomor_bab
+        ]
+        bab_nodes.append(
+            {
+                "nomor_bab": nomor_bab,
+                "judul_bab": bab.get("judul_bab"),
+                "urutan": bab.get("urutan", 0),
+                "pasal_list": bab_pasals,
+            }
+        )
+
+    pasal_tanpa_bab = [
+        build_pasal_node(pasal)
+        for pasal in sorted(pasal_list, key=lambda x: x.get("urutan", 0))
+        if not pasal.get("bab_nomor")
+    ]
+
+    return {
+        "bab_list": bab_nodes,
+        "pasal_tanpa_bab_list": pasal_tanpa_bab,
+        "full_text": parse_result.get("full_text", ""),
+        "page_count": parse_result.get("page_count", 0),
+        "confidence": parse_result.get("confidence", 0),
+        "pages_processed": parse_result.get("pages_processed", 0),
     }

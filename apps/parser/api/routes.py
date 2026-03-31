@@ -777,7 +777,9 @@ async def run_ai_parse_task(
             )
 
         pasal_list = []
+        pasal_bab_mapping = {}
         for pasal in ai_result["pasal_list"]:
+            nomor_bab = pasal.get("nomor_bab")
             pasal_list.append(
                 {
                     "peraturan_id": peraturan_id,
@@ -785,9 +787,10 @@ async def run_ai_parse_task(
                     "judul_pasal": pasal.get("judul_pasal"),
                     "konten_pasal": pasal.get("konten_pasal"),
                     "urutan": pasal.get("urutan"),
-                    "bab_id": None,
+                    "nomor_bab": nomor_bab,
                 }
             )
+            pasal_bab_mapping[pasal.get("nomor_pasal")] = nomor_bab
 
         ayat_list = []
         for ayat in ai_result["ayat_list"]:
@@ -802,27 +805,53 @@ async def run_ai_parse_task(
 
         await bab_repository.delete_by_peraturan(peraturan_id)
 
-        # Save BABs and create mapping
         bab_id_map = {}
         for bab in bab_list:
             bab_id = await bab_repository.create(bab)
             bab_id_map[bab.get("nomor_bab")] = bab_id
 
-        # Save PASALs and create nomor_pasal -> pasal_id mapping
         pasal_id_map = {}
+        pasal_bab_id_map = {}
         for pasal in pasal_list:
-            pasal_id = await pasal_repository.create(pasal)
+            nomor_bab = pasal.get("nomor_bab")
+            bab_id = bab_id_map.get(nomor_bab) if nomor_bab else None
+            pasal_data = {**pasal, "bab_id": bab_id}
+            pasal_id = await pasal_repository.create(pasal_data)
             pasal_id_map[pasal.get("nomor_pasal")] = pasal_id
+            pasal_bab_id_map[pasal.get("nomor_pasal")] = bab_id
 
-        # Save AYATs with correct pasal_id
         for ayat in ayat_list:
             nomor_pasal = ayat.get("nomor_pasal")
             pasal_id = pasal_id_map.get(nomor_pasal)
             if pasal_id is None and pasal_id_map:
                 pasal_id = list(pasal_id_map.values())[0]
 
+            bab_id = pasal_bab_id_map.get(nomor_pasal)
+
             ayat_data = {
                 "pasal_id": pasal_id,
+                "bab_id": bab_id,
+                "peraturan_id": peraturan_id,
+                "nomor_ayat": ayat.get("nomor_ayat"),
+                "konten_ayat": ayat.get("konten_ayat"),
+                "urutan": ayat.get("urutan"),
+            }
+            await ayat_repository.create(ayat_data)
+            pasal_id_map[pasal.get("nomor_pasal")] = pasal_id
+            pasal_bab_id_map[pasal.get("nomor_pasal")] = bab_id
+
+        for ayat in ayat_list:
+            nomor_pasal = ayat.get("nomor_pasal")
+            pasal_id = pasal_id_map.get(nomor_pasal)
+            if pasal_id is None and pasal_id_map:
+                pasal_id = list(pasal_id_map.values())[0]
+
+            bab_id = pasal_bab_id_map.get(nomor_pasal)
+
+            ayat_data = {
+                "pasal_id": pasal_id,
+                "bab_id": bab_id,
+                "peraturan_id": peraturan_id,
                 "nomor_ayat": ayat.get("nomor_ayat"),
                 "konten_ayat": ayat.get("konten_ayat"),
                 "urutan": ayat.get("urutan"),
@@ -1028,19 +1057,19 @@ async def run_parse_task(request: ParseRequest, job_id: str):
                     for bab in ai_result.get("bab_list", [])
                 ]
 
-                pasal_list = [
-                    {
-                        "peraturan_id": peraturan_id,
-                        "nomor_pasal": pasal.get("nomor_pasal"),
-                        "judul_pasal": pasal.get("judul_pasal"),
-                        "konten_pasal": pasal.get("konten_pasal"),
-                        "urutan": pasal.get("urutan"),
-                        "bab_id": None,
-                    }
-                    for pasal in ai_result.get("pasal_list", [])
-                ]
+                pasal_list = []
+                for pasal in ai_result.get("pasal_list", []):
+                    pasal_list.append(
+                        {
+                            "peraturan_id": peraturan_id,
+                            "nomor_pasal": pasal.get("nomor_pasal"),
+                            "judul_pasal": pasal.get("judul_pasal"),
+                            "konten_pasal": pasal.get("konten_pasal"),
+                            "urutan": pasal.get("urutan"),
+                            "nomor_bab": pasal.get("nomor_bab"),
+                        }
+                    )
 
-                # Ayats have nomor_pasal reference, we'll map after inserting pasals
                 ayat_list = [
                     {
                         "nomor_pasal": ayat.get("nomor_pasal"),
@@ -1065,36 +1094,37 @@ async def run_parse_task(request: ParseRequest, job_id: str):
                     },
                 }
 
-                # Save peraturan
                 await peraturan_repository.create(peraturan_final)
 
-                # Delete old bab, pasal, ayat for this peraturan
                 await bab_repository.delete_by_peraturan(peraturan_id)
 
-                # Save BABs and create nomor_bab -> bab_id mapping
                 bab_id_map = {}
                 for bab in bab_list:
                     bab_id = await bab_repository.create(bab)
                     bab_id_map[bab.get("nomor_bab")] = bab_id
 
-                # Save PASALs and create nomor_pasal -> pasal_id mapping
                 pasal_id_map = {}
+                pasal_bab_id_map = {}
                 for pasal in pasal_list:
-                    # Try to find bab_id from nomor_pasal pattern (if ayat mentions bab)
-                    pasal_id = await pasal_repository.create(pasal)
+                    nomor_bab = pasal.get("nomor_bab")
+                    bab_id = bab_id_map.get(nomor_bab) if nomor_bab else None
+                    pasal_data = {**pasal, "bab_id": bab_id}
+                    pasal_id = await pasal_repository.create(pasal_data)
                     pasal_id_map[pasal.get("nomor_pasal")] = pasal_id
+                    pasal_bab_id_map[pasal.get("nomor_pasal")] = bab_id
 
-                # Save AYATs with correct pasal_id
                 for ayat in ayat_list:
                     nomor_pasal = ayat.get("nomor_pasal")
-                    # Find pasal_id from map, default to first pasal if not found
                     pasal_id = pasal_id_map.get(nomor_pasal)
                     if pasal_id is None and pasal_id_map:
-                        # If nomor_pasal is None or not found, use first pasal
                         pasal_id = list(pasal_id_map.values())[0]
+
+                    bab_id = pasal_bab_id_map.get(nomor_pasal)
 
                     ayat_data = {
                         "pasal_id": pasal_id,
+                        "bab_id": bab_id,
+                        "peraturan_id": peraturan_id,
                         "nomor_ayat": ayat.get("nomor_ayat"),
                         "konten_ayat": ayat.get("konten_ayat"),
                         "urutan": ayat.get("urutan"),
