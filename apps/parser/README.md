@@ -335,3 +335,93 @@ See [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) for complete schema documentation
 - [ ] Implement caching for parsed results
 - [ ] Add retry logic for failed parsing
 - [ ] Support for different regulation types (UU, PP, Perpres, etc.)
+
+## Kubernetes Deployment
+
+Parser service dapat di-deploy ke Kubernetes cluster menggunakan manifest files di folder `kubernetes/`.
+
+### Struktur Kubernetes
+
+```
+kubernetes/
+├── namespace.yaml              # Parser namespace (norma-parser)
+├── configmap.yaml              # Environment configuration
+├── secret.yaml                 # Parser secrets
+├── parser-deployment.yaml      # Parser deployment
+├── parser-service.yaml         # Parser service
+├── ingress.yaml                # Ingress config
+├── hpa.yaml                    # Horizontal Pod Autoscaler
+├── pvc.yaml                    # Persistent Volume Claims
+├── postgres-statefulset.yaml   # PostgreSQL StatefulSet
+├── postgres-service.yaml       # PostgreSQL service
+└── parser-*.yaml               # Other parser resources
+```
+
+### Deploy ke Kubernetes
+
+```bash
+# Build Docker image
+docker build -t norma-parser:latest .
+
+# Create namespace dan secrets
+kubectl apply -f kubernetes/namespace.yaml
+kubectl apply -f kubernetes/configmap.yaml
+kubectl apply -f kubernetes/secret.yaml
+
+# Deploy PostgreSQL (jika diperlukan)
+kubectl apply -f kubernetes/postgres-statefulset.yaml
+kubectl apply -f kubernetes/postgres-service.yaml
+kubectl apply -f kubernetes/pvc.yaml
+
+# Deploy Parser
+kubectl apply -f kubernetes/parser-deployment.yaml
+kubectl apply -f kubernetes/parser-service.yaml
+kubectl apply -f kubernetes/ingress.yaml
+kubectl apply -f kubernetes/hpa.yaml
+
+# Check status
+kubectl get all -n norma-parser
+
+# View logs
+kubectl logs -f deployment/parser-api -n norma-parser
+
+# Port forward untuk local testing
+kubectl port-forward svc/parser-api-service 8000:8000 -n norma-parser
+```
+
+### Konfigurasi
+
+Deployment menggunakan:
+- **Namespace**: `norma-parser`
+- **Port**: 8000
+- **Replicas**: 1 (dengan HPA untuk auto-scaling)
+- **Resources**: 256Mi-512Mi memory, 200m-500m CPU
+- **Health Check**: `/api/health` endpoint
+
+Environment variables dikonfigurasi via ConfigMap dan Secret. Pastikan untuk mengupdate `configmap.yaml` dan `secret.yaml` dengan konfigurasi yang sesuai.
+
+### Ingress Access
+
+Parser dapat diakses melalui ingress dengan host `parser.norma.local`:
+
+```bash
+# Add entry to /etc/hosts
+echo "127.0.0.1 parser.norma.local" | sudo tee -a /etc/hosts
+
+# Access via browser or curl
+# http://parser.norma.local/api/health
+```
+
+### Prerequisites
+
+1. Namespace `norma-parser` sudah dibuat:
+   ```bash
+   kubectl apply -f kubernetes/namespace.yaml
+   ```
+
+2. NGINX Ingress Controller terinstall di cluster:
+   ```bash
+   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+   ```
+
+3. PostgreSQL service running (internal atau external)

@@ -157,3 +157,64 @@ go build -o bin/app cmd/main.go
 - **DI Container**: samber/do v2
 - **Env Loader**: godotenv
 - **Architecture**: Clean Architecture / Hexagonal
+
+## Kubernetes Deployment
+
+REST API dapat di-deploy ke Kubernetes cluster menggunakan manifest files di folder `kubernetes/`.
+
+### Struktur Kubernetes
+
+```
+kubernetes/
+├── restapi-deployment.yaml    # Deployment config
+└── restapi-service.yaml       # Service config
+```
+
+### Deploy ke Kubernetes
+
+```bash
+# Build Docker image
+docker build -t norma-restapi:latest .
+
+# Deploy ke cluster
+kubectl apply -f kubernetes/
+
+# Atau apply satu per satu
+kubectl apply -f kubernetes/restapi-deployment.yaml
+kubectl apply -f kubernetes/restapi-service.yaml
+
+# Check status
+kubectl get pods -n norma
+kubectl get services -n norma
+
+# View logs
+kubectl logs -f deployment/restapi -n norma
+
+# Port forward untuk local testing
+kubectl port-forward svc/restapi-service 8080:8080 -n norma
+```
+
+### Konfigurasi
+
+Deployment menggunakan:
+- **Namespace**: `norma`
+- **Port**: 8080
+- **Replicas**: 1
+- **Resources**: 128Mi-256Mi memory, 100m-500m CPU
+- **Health Check**: `/health` endpoint
+
+Environment variables dikonfigurasi di deployment file. Untuk secret seperti `DB_PASSWORD`, menggunakan Kubernetes Secret `norma-secrets` di namespace `norma`.
+
+### Prerequisites
+
+1. Namespace `norma` sudah dibuat:
+   ```bash
+   kubectl apply -f apps/kubernetes/namespace.yaml
+   ```
+
+2. Secret `norma-secrets` sudah dibuat:
+   ```bash
+   kubectl apply -f apps/kubernetes/secret.yaml
+   ```
+
+3. PostgreSQL service running (atau gunakan external database)

@@ -1,36 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_URL = process.env.API_URL || "http://localhost:8080";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+	request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    const { id } = await params;
+	try {
+		const { id } = await params;
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/peraturan/${id}/pasal`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
+		const response = await fetch(
+			`${API_URL}/api/v1/peraturan/${id}/pasal`,
+			{
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				cache: "no-store",
+			},
+		);
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { success: false, message: "Failed to fetch pasal list" },
-        { status: response.status }
-      );
-    }
+		if (!response.ok) {
+			return NextResponse.json(
+				{ success: false, message: "Failed to fetch pasal list" },
+				{ status: response.status },
+			);
+		}
 
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error("Get pasal list error:", error);
-    return NextResponse.json(
-      { success: false, message: "Failed to fetch pasal list" },
-      { status: 500 }
-    );
-  }
+		const data = await response.json();
+		return NextResponse.json(data);
+	} catch (error) {
+		console.error("Get pasal list error:", error);
+		return NextResponse.json(
+			{ success: false, message: "Failed to fetch pasal list" },
+			{ status: 500 },
+		);
+	}
 }

@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, FileText, Scale, BookOpen, Landmark, ArrowRight } from "lucide-react";
 
+const API_URL = process.env.API_URL || "http://localhost:8080";
+
 const stats = [
   { label: "Total Peraturan", value: "12,847", icon: FileText, color: "bg-primary/10 text-primary" },
   { label: "Undang-Undang (UU)", value: "1,234", icon: Scale, color: "bg-civic-emerald/10 text-civic-emerald" },
@@ -40,7 +42,7 @@ interface Peraturan {
 
 async function getRecentPeraturan(): Promise<Peraturan[]> {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/peraturan?limit=4`, {
+    const res = await fetch(`${API_URL}/api/v1/peraturan?limit=4`, {
       cache: "no-store",
     });
     if (!res.ok) return [];
@@ -138,7 +140,7 @@ export default async function HomePage() {
         {recentPeraturan.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">Tidak ada data peraturan. Pastikan backend API berjalan di {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}</p>
+              <p className="text-muted-foreground">Tidak ada data peraturan. Pastikan backend API berjalan.</p>
               <p className="text-sm text-muted-foreground mt-2">
                 Jalankan parser service untuk mengisi data.
               </p>
