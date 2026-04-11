@@ -142,7 +142,7 @@ export default function PeraturanListContent() {
           <p className="font-medium">Error</p>
           <p className="text-sm">{error}</p>
           <p className="text-sm mt-2">
-            Pastikan backend API berjalan di {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}
+            Pastikan backend API berjalan dengan benar.
           </p>
         </div>
       )}

@@ -7,6 +7,10 @@ Platform for managing and querying Indonesian legal documents (peraturan) from p
 ```
 norma/
 ├── apps/
+│   ├── kubernetes/                  # Shared Kubernetes resources
+│   │   ├── namespace.yaml           # Namespace definition
+│   │   └── secret.yaml              # Shared secrets
+│   │
 │   ├── parser/                    # PDF Parser Service (Python/FastAPI)
 │   │   ├── api/                    # API routes
 │   │   ├── db/                     # Database operations
@@ -23,7 +27,18 @@ norma/
 │   │   │   └── status.py           # Parsing status management
 │   │   ├── repositories/           # Database repositories
 │   │   ├── migrations/             # SQL migration files
+│   │   ├── kubernetes/             # Kubernetes manifests
+│   │   │   ├── namespace.yaml      # Parser namespace
+│   │   │   ├── configmap.yaml      # ConfigMap
+│   │   │   ├── secret.yaml         # Secrets
+│   │   │   ├── parser-deployment.yaml
+│   │   │   ├── parser-service.yaml
+│   │   │   ├── ingress.yaml        # Ingress rules
+│   │   │   ├── hpa.yaml            # Horizontal Pod Autoscaler
+│   │   │   ├── pvc.yaml            # Persistent Volume Claims
+│   │   │   └── postgres-*.yaml      # PostgreSQL resources
 │   │   ├── main.py                 # FastAPI entry point
+│   │   ├── Dockerfile              # Docker image
 │   │   ├── pyproject.toml          # UV package configuration
 │   │   └── README.md               # Parser documentation
 │   │
@@ -38,6 +53,10 @@ norma/
 │   │   ├── pkg/
 │   │   │   ├── database/          # Database connection
 │   │   │   └── response/           # HTTP response helpers
+│   │   ├── kubernetes/             # Kubernetes manifests
+│   │   │   ├── restapi-deployment.yaml
+│   │   │   └── restapi-service.yaml
+│   │   ├── Dockerfile              # Docker image
 │   │   ├── go.mod
 │   │   └── README.md
 │   │
@@ -52,7 +71,12 @@ norma/
 │       ├── components/
 │       │   ├── navbar.tsx          # Navigation
 │       │   └── ui/                  # shadcn components
+│       ├── kubernetes/             # Kubernetes manifests
+│       │   ├── web-deployment.yaml
+│       │   ├── web-service.yaml
+│       │   └── web-ingress.yaml
 │       ├── lib/utils.ts            # Utilities
+│       ├── Dockerfile              # Docker image
 │       ├── package.json
 │       └── README.md
 │
@@ -385,6 +409,148 @@ docker-compose logs -f parser
 docker-compose down
 ```
 
+## Kubernetes Deployment
+
+Project ini mendukung deployment ke Kubernetes cluster. Struktur Kubernetes dibagi menjadi:
+
+### Struktur Folder Kubernetes
+
+```
+apps/
+├── kubernetes/                          # Shared Kubernetes resources
+│   ├── namespace.yaml                   # Namespace definition (norma)
+│   └── secret.yaml                      # Shared secrets (DB password)
+│
+├── parser/kubernetes/                   # Parser service K8s resources
+│   ├── namespace.yaml                   # Parser namespace
+│   ├── configmap.yaml                   # ConfigMap for env vars
+│   ├── secret.yaml                      # Parser secrets
+│   ├── parser-deployment.yaml           # Parser deployment
+│   ├── parser-service.yaml              # Parser service
+│   ├── ingress.yaml                     # Ingress rules
+│   ├── hpa.yaml                         # Horizontal Pod Autoscaler
+│   ├── pvc.yaml                         # Persistent Volume Claims
+│   └── postgres-*.yaml                  # PostgreSQL resources
+│
+├── restapi/kubernetes/                  # REST API service K8s resources
+│   ├── restapi-deployment.yaml          # REST API deployment
+│   └── restapi-service.yaml             # REST API service
+│
+└── web/kubernetes/                      # Web frontend K8s resources
+    ├── web-deployment.yaml              # Web deployment
+    ├── web-service.yaml                 # Web service
+    └── web-ingress.yaml                 # Web ingress
+```
+
+### Penjelasan Struktur
+
+1. **`apps/kubernetes/`** - Shared resources yang digunakan oleh semua services:
+   - `namespace.yaml` - Mendefinisikan namespace `norma` untuk mengelompokkan semua resources
+   - `secret.yaml` - Secret yang digunakan bersama: `DB_PASSWORD`, `API_URL`
+
+2. **`apps/parser/kubernetes/`** - Kubernetes resources khusus untuk parser service:
+   - Deployment, Service, Ingress, HPA, PVC, ConfigMap, Secret, dan PostgreSQL resources
+
+3. **`apps/restapi/kubernetes/`** - Kubernetes resources untuk REST API service:
+   - Deployment dan Service untuk menjalankan Go REST API
+
+4. **`apps/web/kubernetes/`** - Kubernetes resources untuk web frontend:
+   - Deployment, Service, dan Ingress untuk Next.js web app
+
+### Deploy ke Kubernetes
+
+```bash
+# 1. Create namespace dan shared secrets
+kubectl apply -f apps/kubernetes/namespace.yaml
+kubectl apply -f apps/kubernetes/secret.yaml
+
+# 2. Deploy REST API (port 8080)
+kubectl apply -f apps/restapi/kubernetes/
+
+# 3. Deploy Web Frontend (port 3000)
+kubectl apply -f apps/web/kubernetes/
+
+# 4. Deploy Parser Service (jika diperlukan)
+kubectl apply -f apps/parser/kubernetes/namespace.yaml
+kubectl apply -f apps/parser/kubernetes/configmap.yaml
+kubectl apply -f apps/parser/kubernetes/secret.yaml
+kubectl apply -f apps/parser/kubernetes/parser-deployment.yaml
+kubectl apply -f apps/parser/kubernetes/parser-service.yaml
+kubectl apply -f apps/parser/kubernetes/ingress.yaml
+
+# Check deployment status
+kubectl get all -n norma
+kubectl get all -n norma-parser
+
+# View logs
+kubectl logs -f deployment/restapi -n norma
+kubectl logs -f deployment/web -n norma
+kubectl logs -f deployment/parser-api -n norma-parser
+```
+
+### Build Docker Images
+
+Sebelum deploy ke K8s, build Docker images terlebih dahulu:
+
+```bash
+# Build REST API image
+docker build -t norma-restapi:latest apps/restapi/
+
+# Build Web Frontend image
+docker build -t norma-web:latest apps/web/
+
+# Build Parser image
+docker build -t norma-parser:latest apps/parser/
+```
+
+### Ingress Configuration
+
+Pastikan ingress controller sudah terinstall di cluster (misalnya NGINX Ingress Controller):
+
+```bash
+# Install NGINX Ingress Controller (jika belum)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+
+# Update /etc/hosts untuk local development
+echo "127.0.0.1 web.norma.local" | sudo tee -a /etc/hosts
+echo "127.0.0.1 parser.norma.local" | sudo tee -a /etc/hosts
+```
+
+### Service URLs (dalam cluster)
+
+- **REST API**: `http://restapi-service:8080`
+- **Web Frontend**: `http://web-service:3000`
+- **Parser**: `http://parser-api-service:8000`
+
+### Environment Variables di Kubernetes
+
+Environment variables dikonfigurasi di deployment files:
+
+**REST API**:
+- `SERVER_HOST`, `SERVER_PORT`, `GIN_MODE`
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_NAME`, `DB_SSLMODE`
+- `DB_PASSWORD` - dari Secret `norma-secrets`
+
+**Web Frontend**:
+- `NODE_ENV=production`
+- `API_URL` - dari Secret `norma-secrets` (server-side only, tidak di-expose ke client)
+- Catatan: Client mengakses backend melalui internal API routes (`/api/peraturan/*`)
+
+**Parser**:
+- Semua env vars dari ConfigMap dan Secret
+- Lihat `apps/parser/kubernetes/configmap.yaml` dan `apps/parser/kubernetes/secret.yaml`
+
+**Secrets**:
+
+Secrets disimpan di `apps/kubernetes/secret.yaml`:
+- `DB_PASSWORD` - Database password
+- `API_URL` - REST API URL (server-side only, tidak di-expose ke client)
+
+```bash
+# Edit secret jika perlu
+kubectl edit secret norma-secrets -n norma
+```
+
 ## Architecture
 
 ### Parser Service Architecture
@@ -425,18 +591,6 @@ Next.js App Router
           ├── List (filter, search, table)
           └── Detail (BAB accordion, Pasal preview)
 ```
-
-## Theme: Civic Ledger
-
-The web frontend uses the **Civic Ledger** theme designed for professional legal document interfaces:
-
-- **Primary**: Deep Navy Blue (`#1e3a5f`)
-- **Accents**: 
-  - Emerald (PP badges)
-  - Amber (Perpres badges)
-  - Teal (Permen badges)
-- **Typography**: Inter font
-- **Components**: shadcn/ui with Tailwind CSS v4
 
 ## License
 
