@@ -14,6 +14,8 @@ import {
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
+const API_URL = process.env.API_URL || "http://localhost:8080";
+
 const stats = [
 	{
 		label: "Total Peraturan",
@@ -88,6 +90,7 @@ interface Peraturan {
 }
 
 async function getRecentPeraturan(): Promise<Peraturan[]> {
+<<<<<<< HEAD
 	try {
 		const res = await fetch(`${API_URL}/api/v1/peraturan?limit=4`, {
 			cache: "no-store",
@@ -98,6 +101,18 @@ async function getRecentPeraturan(): Promise<Peraturan[]> {
 	} catch {
 		return [];
 	}
+=======
+  try {
+    const res = await fetch(`${API_URL}/api/v1/peraturan?limit=4`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+>>>>>>> c7e2609ffbce6d65b79334678c3bf06261b6042a
 }
 
 export default async function HomePage() {
@@ -160,6 +175,7 @@ export default async function HomePage() {
 				))}
 			</section>
 
+<<<<<<< HEAD
 			{/* Categories */}
 			<section>
 				<h2 className="text-2xl font-bold text-foreground mb-6">
@@ -251,3 +267,58 @@ export default async function HomePage() {
 		</div>
 	);
 }
+=======
+      {/* Recent Peraturan */}
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-foreground">Peraturan Terbaru</h2>
+          <Link
+            href="/peraturan"
+            className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1"
+          >
+            Lihat Semua <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        {recentPeraturan.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <p className="text-muted-foreground">Tidak ada data peraturan. Pastikan backend API berjalan.</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Jalankan parser service untuk mengisi data.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {recentPeraturan.map((peraturan) => (
+              <Card key={peraturan.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <Badge className={categoryColors[peraturan.kategori] || "bg-muted text-muted-foreground"}>
+                      {peraturan.kategori}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">{peraturan.tahun}</span>
+                  </div>
+                  <CardTitle className="text-lg line-clamp-2 mt-2">
+                    <Link
+                      href={`/peraturan/${peraturan.id}`}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {peraturan.judul}
+                    </Link>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    {peraturan.tentang}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+>>>>>>> c7e2609ffbce6d65b79334678c3bf06261b6042a
