@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parser-api
-  namespace: norma-parser
+  namespace: norma
   labels:
     app: parser-api
 spec:
@@ -16,103 +16,149 @@ spec:
         app: parser-api
     spec:
       containers:
-      - name: parser-api
-        image: norma-parser:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8000
-          name: http
-          protocol: TCP
-        env:
-        # Database Configuration from ConfigMap
-        - name: DB_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_HOST
-        - name: DB_PORT
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_PORT
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_NAME
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_USER
-        - name: DB_MIN_CONNECTIONS
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_MIN_CONNECTIONS
-        - name: DB_MAX_CONNECTIONS
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: DB_MAX_CONNECTIONS
+        - name: parser-api
+          image: registry.hendrywilliam.com/norma-parser:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          env:
+            # Database Configuration from ConfigMap
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_USER
+            - name: DB_MIN_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_MIN_CONNECTIONS
+            - name: DB_MAX_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: DB_MAX_CONNECTIONS
 
-        # Database Password from Secret
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: parser-secrets
-              key: DB_PASSWORD
+            # Database Password from Secret
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: parser-secrets
+                  key: DB_PASSWORD
 
-        # Application Configuration
-        - name: HOST
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: HOST
-        - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: PORT
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: LOG_LEVEL
-        - name: RELOAD
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: RELOAD
+            # Application Configuration
+            - name: HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: PORT
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: LOG_LEVEL
 
-        # Scraping Configuration
-        - name: REQUEST_DELAY
-          valueFrom:
-            configMapKeyRef:
-              name: parser-config
-              key: REQUEST_DELAY
+            # Scraping Configuration
+            - name: SCRAPER_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: SCRAPER_BASE_URL
+            - name: SCRAPER_REQUEST_DELAY
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: SCRAPER_REQUEST_DELAY
+            - name: SCRAPER_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: SCRAPER_TIMEOUT
 
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: http
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: http
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
+            # PDF Parser Configuration
+            - name: PDF_PARSER_MAX_PAGES
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: PDF_PARSER_MAX_PAGES
+            - name: PDF_PARSER_EXTRACT_IMAGES
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: PDF_PARSER_EXTRACT_IMAGES
+
+            # GLM AI Configuration from Secret
+            - name: GLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: parser-secrets
+                  key: GLM_API_KEY
+
+            # GLM AI Configuration from ConfigMap
+            - name: GLM_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: GLM_MODEL
+            - name: GLM_MAX_TOKENS
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: GLM_MAX_TOKENS
+            - name: GLM_TEMPERATURE
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: GLM_TEMPERATURE
+            - name: GLM_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: parser-config
+                  key: GLM_TIMEOUT
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
       restartPolicy: Always

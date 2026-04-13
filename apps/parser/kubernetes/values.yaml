@@ -2,7 +2,7 @@
 # Ganti nilai-nilai sesuai environment
 
 # Namespace
-namespace: norma-parser
+namespace: norma
 
 # Database Configuration
 database:

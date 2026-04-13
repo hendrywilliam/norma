@@ -4,7 +4,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
   name: parser-ingress
-  namespace: norma-parser
+  namespace: norma
 spec:
   ingressClassName: prod
   tls:

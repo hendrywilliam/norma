@@ -10,7 +10,6 @@ import aiohttp
 import asyncio
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +316,7 @@ async def parse_pdf_with_ai(
     api_key: str,
     peraturan_info: Optional[Dict[str, Any]] = None,
     model: str = "glm-4v-flash",
-    concurrency: int = 3,
+    concurrency: int = 2,
     scale: float = 2.0,
 ) -> Dict[str, Any]:
     """
@@ -422,86 +421,4 @@ async def parse_pdf_with_ai(
         "page_count": len(pages),
         "confidence": avg_confidence,
         "pages_processed": len(parsed_pages),
-    }
-
-
-def build_tree_from_parse_result(parse_result: Dict[str, Any]) -> Dict[str, Any]:
-    """Build tree structure from flat parse result
-
-    Args:
-        parse_result: Dictionary with bab_list, pasal_list, ayat_list
-
-    Returns:
-        Dictionary with bab_list (tree), pasal_tanpa_bab_list (tree)tree structure for AI result"""
-    bab_list = parse_result.get("bab_list", [])
-    pasal_list = parse_result.get("pasal_list", [])
-    ayat_list = parse_result.get("ayat_list", [])
-
-    ayat_by_pasal: Dict[str, List[Dict[str, Any]]] = {}
-    for ayat in ayat_list:
-        nomor_pasal = ayat.get("nomor_pasal", "")
-        if nomor_pasal not in ayat_by_pasal:
-            ayat_by_pasal[nomor_pasal] = []
-        ayat_by_pasal[nomor_pasal].append(ayat)
-
-    pasal_by_nomor: Dict[str, Dict[str, Any]] = {}
-    for pasal in pasal_list:
-        nomor_pasal = pasal.get("nomor_pasal", "")
-        pasal_by_nomor[nomor_pasal] = pasal
-
-    bab_by_nomor: Dict[str, Dict[str, Any]] = {}
-    for bab in bab_list:
-        nomor_bab = bab.get("nomor_bab", "")
-        bab_by_nomor[nomor_bab] = bab
-
-    def build_ayat_nodes(nomor_pasal: str, ayat_by_pasal_map: Dict) -> List[Dict[str, Any]]:
-        """Build ayat nodes for a pasal"""
-        ayats = ayat_by_pasal_map.get(nomor_pasal, [])
-        return [
-            {
-                "nomor_ayat": ayat.get("nomor_ayat", ""),
-                "konten_ayat": ayat.get("konten_ayat", ""),
-                "urutan": ayat.get("urutan", 0),
-            }
-            for ayat in sorted(ayats, key=lambda x: x.get("urutan", 0))
-        ]
-
-    def build_pasal_node(pasal: Dict[str, Any]) -> Dict[str, Any]:
-        """Build pasal node with ayat_list"""
-        return {
-            "nomor_pasal": pasal.get("nomor_pasal", ""),
-            "judul_pasal": pasal.get("judul_pasal"),
-            "konten_pasal": pasal.get("konten_pasal", ""),
-            "urutan": pasal.get("urutan", 0),
-            "ayat_list": build_ayat_nodes(pasal.get("nomor_pasal", ""), ayat_by_pasal),
-        }
-
-    bab_nodes = []
-    for bab in sorted(bab_list, key=lambda x: x.get("urutan", 0)):
-        nomor_bab = bab.get("nomor_bab", "")
-        bab_pasals = [
-            build_pasal_node(pasal) for pasal in pasal_list if pasal.get("bab_nomor") == nomor_bab
-        ]
-        bab_nodes.append(
-            {
-                "nomor_bab": nomor_bab,
-                "judul_bab": bab.get("judul_bab"),
-                "urutan": bab.get("urutan", 0),
-                "pasal_list": bab_pasals,
-            }
-        )
-
-    pasal_tanpa_bab = [
-        build_pasal_node(pasal)
-        for pasal in sorted(pasal_list, key=lambda x: x.get("urutan", 0))
-        if not pasal.get("bab_nomor")
-    ]
-
-    return {
-        "bab_list": bab_nodes,
-        "pasal_tanpa_bab_list": pasal_tanpa_bab,
-        "full_text": parse_result.get("full_text", ""),
-        "page_count": parse_result.get("page_count", 0),
-        "confidence": parse_result.get("confidence", 0),
-        "pages_processed": parse_result.get("pages_processed", 0),
     }

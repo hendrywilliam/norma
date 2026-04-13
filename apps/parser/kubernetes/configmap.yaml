@@ -2,21 +2,32 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: parser-config
-  namespace: norma-parser
+  namespace: norma
 data:
   # Database Configuration
   DB_HOST: "postgres-service"
   DB_PORT: "5432"
-  DB_NAME: "peraturan_db"
+  DB_NAME: "postgres"
   DB_USER: "postgres"
   DB_MIN_CONNECTIONS: "1"
   DB_MAX_CONNECTIONS: "10"
 
   # Application Configuration
-  HOST: "0.0.0.0.0"
+  HOST: "0.0.0.0"
   PORT: "8000"
-  LOG_LEVEL: "info"
-  RELOAD: "false"
+  LOG_LEVEL: "INFO"
 
   # Scraping Configuration
-  REQUEST_DELAY: "1"
+  SCRAPER_BASE_URL: "https://peraturan.go.id"
+  SCRAPER_REQUEST_DELAY: "1"
+  SCRAPER_TIMEOUT: "30"
+
+  # PDF Parser Configuration
+  PDF_PARSER_MAX_PAGES: "1000"
+  PDF_PARSER_EXTRACT_IMAGES: "false"
+
+  # GLM AI Configuration
+  GLM_MODEL: "glm-4.6v"
+  GLM_MAX_TOKENS: "4096"
+  GLM_TEMPERATURE: "0.1"
+  GLM_TIMEOUT: "120"
