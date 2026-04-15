@@ -68,8 +68,8 @@ class ParseRequest(BaseModel):
     category: Optional[str] = None
     year: Optional[int] = None
     force: bool = False
-    model: str = "glm-4.6v"
-    concurrency: int = 3
+    model: str = "GLM-4.6V"
+    concurrency: int = 5
 
 
 class ParseResponse(BaseModel):
@@ -138,7 +138,7 @@ async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks
         request: Parse request dengan parameter:
         - url: URL spesifik atau kosong untuk semua peraturan
         - api_key: GLM API key (wajib)
-        - model: GLM model (default: glm-4v)
+        - model: GLM model (default: GLM-4.6V)
         - concurrency: Concurrent page processing (default: 3)
 
     Flow:
@@ -520,15 +520,15 @@ _ai_parse_jobs: Dict[str, Dict[str, Any]] = {}
 async def trigger_ai_parse(
     peraturan_id: str,
     background_tasks: BackgroundTasks,
-    model: str = "glm-4.6v",
-    concurrency: int = 3,
+    model: str = "GLM-4.6V",
+    concurrency: int = 5,
 ):
     """Trigger AI-based PDF parsing using GLM-4V vision model
 
     Args:
         peraturan_id: ID peraturan yang akan di-parse
         background_tasks: FastAPI background tasks
-        model: GLM model to use (glm-4v or glm-4v)
+        model: GLM model to use (default: GLM-4.6V)
         concurrency: Number of concurrent page processing
 
     Returns:
@@ -586,8 +586,8 @@ async def trigger_ai_parse_from_url(
     nomor: Optional[str] = None,
     tahun: Optional[int] = None,
     kategori: str = "UU",
-    model: str = "glm-4.6v",
-    concurrency: int = 3,
+    model: str = "GLM-4.6V",
+    concurrency: int = 5,
 ):
     """Trigger AI-based PDF parsing from a URL directly
 

@@ -27,7 +27,7 @@ data:
   PDF_PARSER_EXTRACT_IMAGES: "false"
 
   # GLM AI Configuration
-  GLM_MODEL: "glm-4.6v"
+  GLM_MODEL: "GLM-4.6V"
   GLM_MAX_TOKENS: "4096"
   GLM_TEMPERATURE: "0.1"
   GLM_TIMEOUT: "120"

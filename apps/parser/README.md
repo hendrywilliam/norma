@@ -168,8 +168,8 @@ curl -X POST "http://localhost:8000/api/parse/ai" \
   -d '{
     "peraturan_id": "UU_1_2023_ABC123",
     "api_key": "your_glm_api_key",
-    "model": "glm-4v",
-    "concurrency": 3,
+    "model": "GLM-4.6V",
+    "concurrency": 5,
     "use_fallback": true
   }'
 ```

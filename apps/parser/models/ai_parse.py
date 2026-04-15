@@ -14,9 +14,9 @@ class AIParseRequest(BaseModel):
     pdf_url: Optional[str] = Field(None, description="URL to PDF file")
     peraturan_id: str = Field(..., description="ID of the peraturan")
     api_key: str = Field(..., description="GLM API key")
-    model: str = Field(default="glm-4v", description="GLM model to use (glm-4v or glm-4v-plus)")
+    model: str = Field(default="GLM-4.6V", description="GLM model to use")
     concurrency: int = Field(
-        default=3, ge=1, le=10, description="Number of concurrent page processing"
+        default=5, ge=1, le=10, description="Number of concurrent page processing"
     )
     scale: float = Field(default=2.0, ge=1.0, le=4.0, description="Image scale factor for quality")
     use_fallback: bool = Field(
@@ -69,7 +69,7 @@ class GLMConfigModel(BaseModel):
     """Configuration for GLM API"""
 
     api_key: str = Field(..., description="GLM API key")
-    model: str = Field(default="glm-4v", description="Model to use (glm-4v or glm-4v-plus)")
+    model: str = Field(default="GLM-4.6V", description="GLM model to use")
     max_tokens: int = Field(
         default=4096, ge=256, le=8192, description="Maximum tokens for response"
     )
@@ -103,9 +103,9 @@ class AIBatchParseRequest(BaseModel):
     peraturan_ids: List[str] = Field(
         ..., min_length=1, description="List of peraturan IDs to parse"
     )
-    model: str = Field(default="glm-4v", description="GLM model to use")
+    model: str = Field(default="GLM-4.6V", description="GLM model to use")
     concurrency: int = Field(
-        default=3, ge=1, le=10, description="Number of concurrent page processing"
+        default=5, ge=1, le=10, description="Number of concurrent page processing"
     )
 
 

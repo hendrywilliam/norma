@@ -19,7 +19,7 @@ GLM_46V_API_URL = "https://api.z.ai/api/paas/v4/chat/completions"
 @dataclass
 class GLMConfig:
     api_key: str
-    model: str = "glm-4.6v"
+    model: str = "GLM-4.6V"
     max_tokens: int = 4096
     temperature: float = 0.1
     timeout: int = 120
@@ -36,10 +36,40 @@ class ParsedPage:
 
 
 class GLM46VAgent:
+    MAX_CONCURRENT_API_CALLS = 10
+    MIN_REQUEST_INTERVAL = 0.5
+
+    _global_semaphore: Optional[asyncio.Semaphore] = None
+    _last_request_time: float = 0.0
+    _interval_lock: Optional[asyncio.Lock] = None
+
     def __init__(self, config: GLMConfig):
         self.config = config
         self.api_url = GLM_46V_API_URL
         self._session: Optional[aiohttp.ClientSession] = None
+
+    @classmethod
+    def _get_rate_limiter(cls) -> asyncio.Semaphore:
+        if cls._global_semaphore is None:
+            cls._global_semaphore = asyncio.Semaphore(cls.MAX_CONCURRENT_API_CALLS)
+        if cls._interval_lock is None:
+            cls._interval_lock = asyncio.Lock()
+        return cls._global_semaphore
+
+    async def _throttle(self) -> None:
+        lock = self._get_interval_lock()
+        async with lock:
+            now = asyncio.get_event_loop().time()
+            elapsed = now - GLM46VAgent._last_request_time
+            if elapsed < self.MIN_REQUEST_INTERVAL:
+                await asyncio.sleep(self.MIN_REQUEST_INTERVAL - elapsed)
+            GLM46VAgent._last_request_time = asyncio.get_event_loop().time()
+
+    @classmethod
+    def _get_interval_lock(cls) -> asyncio.Lock:
+        if cls._interval_lock is None:
+            cls._interval_lock = asyncio.Lock()
+        return cls._interval_lock
 
     async def __aenter__(self):
         self._session = aiohttp.ClientSession(
@@ -177,37 +207,65 @@ IMPORTANT:
             "temperature": self.config.temperature,
         }
 
-        try:
-            async with session.post(self.api_url, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    logger.error(f"GLM API error {response.status}: {error_text}")
-                    raise Exception(f"GLM API error: {response.status} - {error_text}")
+        max_retries = 5
+        base_delay = 2.0
+        rate_limiter = self._get_rate_limiter()
 
-                result = await response.json()
+        for attempt in range(max_retries):
+            result = None
+            status_429 = False
+            try:
+                await self._throttle()
+                async with rate_limiter:
+                    async with session.post(
+                        self.api_url, headers=headers, json=payload
+                    ) as response:
+                        if response.status == 429:
+                            status_429 = True
+                        elif response.status != 200:
+                            error_text = await response.text()
+                            raise Exception(f"GLM API error: {response.status} - {error_text}")
+                        else:
+                            result = await response.json()
 
-            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if status_429:
+                    delay = base_delay * (2**attempt)
+                    logger.warning(
+                        f"Rate limited on page {page_number}, retrying in {delay}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
 
-            parsed_data = self._parse_response(content)
+                content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-            return ParsedPage(
-                page_number=page_number,
-                bab_list=parsed_data.get("bab_list", []),
-                pasal_list=parsed_data.get("pasal_list", []),
-                ayat_list=parsed_data.get("ayat_list", []),
-                raw_text=parsed_data.get("raw_text", ""),
-                confidence=parsed_data.get("confidence", 0.8),
-            )
+                parsed_data = self._parse_response(content)
 
-        except aiohttp.ClientError as e:
-            logger.error(f"Network error parsing page {page_number}: {e}")
-            raise
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error for page {page_number}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error parsing page {page_number}: {e}")
-            raise
+                return ParsedPage(
+                    page_number=page_number,
+                    bab_list=parsed_data.get("bab_list", []),
+                    pasal_list=parsed_data.get("pasal_list", []),
+                    ayat_list=parsed_data.get("ayat_list", []),
+                    raw_text=parsed_data.get("raw_text", ""),
+                    confidence=parsed_data.get("confidence", 0.8),
+                )
+
+            except aiohttp.ClientError as e:
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2**attempt)
+                    logger.warning(
+                        f"Network error on page {page_number}: {e}, retrying in {delay}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                logger.error(f"Network error parsing page {page_number}: {e}")
+                raise
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error for page {page_number}: {e}")
+                raise
+
+        raise Exception(
+            f"GLM API rate limit exceeded after {max_retries} retries for page {page_number}"
+        )
 
     def _parse_response(self, content: str) -> Dict[str, Any]:
         content = content.strip()
@@ -248,13 +306,14 @@ IMPORTANT:
         self,
         pages: List[Dict[str, Any]],
         peraturan_info: Optional[Dict[str, Any]] = None,
-        concurrency: int = 3,
+        concurrency: int = 5,
     ) -> List[ParsedPage]:
+        effective_concurrency = min(concurrency, self.MAX_CONCURRENT_API_CALLS)
         previous_babs: List[Dict[str, Any]] = []
         previous_pasals: List[Dict[str, Any]] = []
         current_bab_container: List[Optional[str]] = [None]
 
-        semaphore = asyncio.Semaphore(concurrency)
+        semaphore = asyncio.Semaphore(effective_concurrency)
         state_lock = asyncio.Lock()
 
         async def parse_with_semaphore(page_data: Dict[str, Any], idx: int) -> ParsedPage:
@@ -315,8 +374,8 @@ async def parse_pdf_with_ai(
     pdf_source: Any,
     api_key: str,
     peraturan_info: Optional[Dict[str, Any]] = None,
-    model: str = "glm-4v-flash",
-    concurrency: int = 2,
+    model: str = "GLM-4.6V",
+    concurrency: int = 5,
     scale: float = 2.0,
 ) -> Dict[str, Any]:
     """
@@ -326,7 +385,7 @@ async def parse_pdf_with_ai(
         pdf_source: PDF file path, bytes, or file-like object
         api_key: GLM API key
         peraturan_info: Info about the regulation (judul, nomor, etc.)
-        model: Model to use (default: glm-4v-flash)
+        model: Model to use (default: GLM-4.6V)
         concurrency: Number of concurrent page processing
         scale: Image scale factor
 
