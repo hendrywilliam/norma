@@ -31,6 +31,11 @@ spec:
                 secretKeyRef:
                   name: norma-secrets
                   key: API_URL
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 3000
+            allowPrivilegeEscalation: false
           resources:
             requests:
               memory: "512Mi"

@@ -45,6 +45,11 @@ spec:
           value: "peraturan_db"
         - name: DB_SSLMODE
           value: "disable"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 3000
+          allowPrivilegeEscalation: false
         resources:
           requests:
             memory: "128Mi"

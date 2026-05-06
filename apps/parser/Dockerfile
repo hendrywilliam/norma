@@ -1,21 +1,35 @@
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_CACHE_DIR=/tmp/uv-cache
+
+COPY pyproject.toml uv.lock ./
+
+RUN uv sync --frozen --no-dev --no-install-project
+
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install UV
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -m -d /home/appuser appuser && \
+    mkdir -p /home/appuser/.cache/uv && \
+    chown -R appuser:appuser /home/appuser
 
-# Copy project files
-COPY pyproject.toml uv.lock README.md ./
+ENV UV_CACHE_DIR=/home/appuser/.cache/uv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Install dependencies
-RUN uv sync --frozen --no-dev
+COPY --from=builder /app/.venv /app/.venv
 
-# Copy source code
 COPY . .
 
-# Expose port
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
-# Run the application
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

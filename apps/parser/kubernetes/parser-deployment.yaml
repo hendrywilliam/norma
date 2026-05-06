@@ -24,6 +24,10 @@ spec:
               name: http
               protocol: TCP
           env:
+            # UV Cache Directory (writable by non-root user)
+            - name: UV_CACHE_DIR
+              value: "/home/appuser/.cache/uv"
+
             # Database Configuration from ConfigMap
             - name: DB_HOST
               valueFrom:
@@ -138,6 +142,11 @@ spec:
                   name: parser-config
                   key: GLM_TIMEOUT
 
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
           resources:
             requests:
               memory: "512Mi"

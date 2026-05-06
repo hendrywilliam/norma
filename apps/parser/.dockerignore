@@ -1,0 +1,15 @@
+.venv
+.env
+.ruff_cache
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+AGENTS.md
+DATABASE_SCHEMA.md
+README.md
+kubernetes/
+.dockerignore
+Dockerfile
+.python-version
