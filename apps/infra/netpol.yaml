@@ -1,0 +1,81 @@
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: db-netpol
+  namespace: norma
+spec:
+  selector: app == 'postgres'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'restapi'
+      destination:
+        ports:
+          - '5432'
+  egress:
+    - action: Allow
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: parser-netpol
+  namespace: norma
+spec:
+  selector: app == 'parser-api'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'restapi'
+      destination:
+        ports:
+          - '8000'
+  egress:
+    - action: Allow
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: restapi-netpol
+  namespace: norma
+spec:
+  selector: app == 'restapi'
+  ingress:
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'web'
+      destination:
+        ports:
+          - '8080'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'postgres'
+        ports:
+          - '5432'
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'parser-api'
+        ports:
+          - '8000'
+---
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: web-netpol
+  namespace: norma
+spec:
+  selector: app == 'web'
+  egress:
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'restapi'
+        ports:
+          - '8080'
+  ingress:
+    - action: Allow
