@@ -13,6 +13,13 @@ spec:
       destination:
         ports:
           - '5432'
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'parser-api'
+      destination:
+        ports:
+          - '5432'
   egress:
     - action: Allow
 ---
@@ -33,6 +40,17 @@ spec:
           - '8000'
   egress:
     - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'postgres'
+        ports:
+          - '5432'
+    - action: Allow
+      protocol: TCP
+      destination:
+        selector: app == 'restapi'
+        ports:
+          - '8080'
 ---
 apiVersion: projectcalico.org/v3
 kind: NetworkPolicy
@@ -46,6 +64,13 @@ spec:
       protocol: TCP
       source:
         selector: app == 'web'
+      destination:
+        ports:
+          - '8080'
+    - action: Allow
+      protocol: TCP
+      source:
+        selector: app == 'parser-api'
       destination:
         ports:
           - '8080'

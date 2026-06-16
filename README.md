@@ -7,7 +7,13 @@ Three services:
 - **REST API** (Go/Gin) — Clean Architecture CRUD for legal documents
 - **Web** (Next.js 16/shadcn) — Browsing and search with Civic Ledger theme
 
-Stack: PostgreSQL 16, Docker/K8s.
+Stack: PostgreSQL 16, Docker/K8s (Calico CNI), Go, Python.
+
+## Network Segmentation
+
+Calico NetworkPolicy enforces least-privilege communication between deployments in the `norma` namespace.
+Web is the only service exposed to the internet.
+All other cross-deployment traffic is denied by default. e.g. `web` has no egress to `postgres`.
 
 ```bash
 # Start Postgres
