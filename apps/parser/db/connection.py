@@ -1,6 +1,6 @@
 """
-Database Connection Management dengan Connection Pooling
-Module ini menghandle koneksi ke PostgreSQL dengan asyncpg dan connection pooling
+Database Connection Management with Connection Pooling
+This module handles PostgreSQL connections with asyncpg and connection pooling
 """
 
 import asyncpg
@@ -24,7 +24,7 @@ async def init_db_pool(
     max_connections: int = 10,
 ) -> None:
     """
-    Inisialisasi database connection pool
+    Initialize database connection pool
 
     Args:
         host: Database host
@@ -32,8 +32,8 @@ async def init_db_pool(
         database: Database name
         user: Database user
         password: Database password
-        min_connections: Minimum connections di pool
-        max_connections: Maximum connections di pool
+        min_connections: Minimum connections in pool
+        max_connections: Maximum connections in pool
     """
     global _db_pool
 
@@ -59,7 +59,7 @@ async def init_db_pool(
 
 
 async def close_db_pool() -> None:
-    """Tutup semua koneksi di pool"""
+    """Close all connections in pool"""
     global _db_pool
 
     if _db_pool:
@@ -71,7 +71,7 @@ async def close_db_pool() -> None:
 @asynccontextmanager
 async def get_db_connection():
     """
-    Context manager untuk mendapatkan koneksi database dari pool
+    Context manager to get a database connection from the pool
 
     Usage:
         async with get_db_connection() as conn:
@@ -93,14 +93,14 @@ async def get_db_connection():
 @asynccontextmanager
 async def get_db_transaction():
     """
-    Context manager untuk transaksi database otomatis
+    Context manager for automatic database transactions
 
     Usage:
         async with get_db_transaction() as conn:
-            # Semua perintah di sini adalah bagian dari satu transaksi
+            # All commands here are part of a single transaction
             await conn.execute("INSERT INTO ...")
 
-    Rollback otomatis jika exception, commit jika sukses.
+    Automatic rollback on exception, commit on success.
     """
     async with get_db_connection() as conn:
         async with conn.transaction():
@@ -113,10 +113,10 @@ async def get_db_transaction():
 
 def get_pool_status() -> dict:
     """
-    Get status dari connection pool
+    Get status of the connection pool
 
     Returns:
-        Dictionary dengan informasi pool
+        Dictionary with pool information
     """
     global _db_pool
 
@@ -133,19 +133,19 @@ def get_pool_status() -> dict:
 
 async def execute_query(query: str, args: tuple = (), fetch: str = "one") -> Optional[Any]:
     """
-    Execute query dengan parameterized statement (prepared statement)
+    Execute query with parameterized statement (prepared statement)
 
     Args:
-        query: SQL query dengan positional parameters ($1, $2, etc.)
+        query: SQL query with positional parameters ($1, $2, etc.)
         args: Tuple of parameter values
         fetch: Type of fetch ('one', 'all', 'val', 'exec')
 
     Returns:
-        Result berdasarkan type fetch
+        Result based on fetch type
 
     Note:
-        Menggunakan positional parameters ($1, $2, etc.) mencegah SQL injection
-        karena asyncpg akan memvalidasi dan escape parameter dengan benar.
+        Using positional parameters ($1, $2, etc.) prevents SQL injection
+        because asyncpg validates and escapes parameters correctly.
     """
     async with get_db_connection() as conn:
         try:
@@ -171,7 +171,7 @@ async def execute_query(query: str, args: tuple = (), fetch: str = "one") -> Opt
 
 async def execute_transaction(queries: list[tuple[str, tuple]]) -> list[Any]:
     """
-    Execute multiple queries dalam satu transaksi
+    Execute multiple queries in a single transaction
 
     Args:
         queries: List of (query, args) tuples
@@ -197,49 +197,49 @@ async def execute_transaction(queries: list[tuple[str, tuple]]) -> list[Any]:
         return results
 
 
-# Helper functions untuk escaping parameter jika diperlukan
-# Namun, asyncpg sudah melakukan escaping otomatis untuk positional parameters
+# Helper functions for parameter escaping if needed
+# However, asyncpg already does automatic escaping for positional parameters
 
 
 def validate_identifier(identifier: str) -> bool:
     """
-    Validasi bahwa identifier hanya berisi karakter aman untuk SQL identifier
+    Validate that identifier only contains safe characters for SQL identifier
 
     Args:
-        identifier: SQL identifier (table name, column name, dll.)
+        identifier: SQL identifier (table name, column name, etc.)
 
     Returns:
-        True jika aman, False jika tidak
+        True if safe, False otherwise
 
     Note:
-        Gunakan ini HANYA untuk identifier, bukan untuk values.
-        Untuk values, gunakan positional parameters ($1, $2, dll.)
+        Use this ONLY for identifiers, not for values.
+        For values, use positional parameters ($1, $2, etc.)
     """
     import re
 
-    # Hanya izinkan alphanumeric, underscore, dan dot
+    # Only allow alphanumeric, underscore, and dot
     pattern = r"^[a-zA-Z0-9_\.]+$"
     return bool(re.match(pattern, identifier))
 
 
 def sanitize_search_query(query: str) -> str:
     """
-    Sanitize search query untuk full-text search
+    Sanitize search query for full-text search
 
     Args:
-        query: Search query dari user
+        query: User search query
 
     Returns:
-        Sanitized query yang aman untuk plainto_tsquery
+        Sanitized query safe for plainto_tsquery
 
     Note:
-        Fungsi ini melakukan sanitasi dasar untuk tsquery.
-        Gunakan parameterized query untuk keamanan maksimal.
+        This function performs basic sanitization for tsquery.
+        Use parameterized queries for maximum security.
     """
     if not query:
         return ""
 
-    # Hapus karakter spesial berbahaya
+    # Remove dangerous special characters
     dangerous_chars = ["'", '"', ";", "--", "/*", "*/"]
     sanitized = query
     for char in dangerous_chars:

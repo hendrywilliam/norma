@@ -1,5 +1,5 @@
 """
-Parser module untuk peraturan.go.id
+Parser module for peraturan.go.id
 """
 
 from .scraper import scrape_peraturan, download_pdf

@@ -1,6 +1,6 @@
 """
-Repository untuk Tabel Ayat
-CRUD operations untuk tabel ayat
+Repository for Ayat Table
+CRUD operations for ayat table
 """
 
 from typing import List, Dict, Optional, Any
@@ -14,19 +14,19 @@ logger = logging.getLogger(__name__)
 
 
 # ========================================
-# Repository Class untuk Ayat
+# Repository Class for Ayat
 # ========================================
 
 
 class AyatRepository:
-    """Repository class untuk tabel ayat"""
+    """Repository class for ayat table"""
 
     async def create(self, ayat_data: Dict[str, Any]) -> int:
         """
-        Create ayat baru di database
+        Create new ayat in database
 
         Args:
-            ayat_data: Dictionary data ayat dengan:
+            ayat_data: Dictionary of ayat data with:
                 - nomor_ayat: str
                 - konten_ayat: str
                 - urutan: int
@@ -36,10 +36,10 @@ class AyatRepository:
                 - metadata: Optional[dict]
 
         Returns:
-            ID ayat yang dibuat
+            ID of created ayat
 
         Raises:
-            Exception: Jika gagal membuat ayat
+            Exception: If failed to create ayat
         """
         insert_query = """
         INSERT INTO ayats (
@@ -84,10 +84,10 @@ class AyatRepository:
         Get ayat by ID
 
         Args:
-            ayat_id: ID ayat
+            ayat_id: ID of ayat
 
         Returns:
-            Dictionary data ayat atau None jika tidak ditemukan
+            Dictionary of ayat data or None if not found
         """
         select_query = """
         SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
@@ -102,15 +102,15 @@ class AyatRepository:
         self, pasal_id: int, skip: int = 0, limit: int = 50
     ) -> List[Dict[str, Any]]:
         """
-        Get list ayat untuk pasal spesifik
+        Get list of ayats for specific pasal
 
         Args:
-            pasal_id: ID pasal
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            pasal_id: ID of pasal
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            List dari ayat dictionaries
+            List of ayat dictionaries
         """
         select_query = """
         SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
@@ -128,15 +128,15 @@ class AyatRepository:
         self, peraturan_id: str, skip: int = 0, limit: int = 10000
     ) -> List[Dict[str, Any]]:
         """
-        Get list ayat untuk peraturan spesifik (menggunakan peraturan_id yang sudah di-denormalize)
+        Get list of ayats for specific peraturan (using denormalized peraturan_id)
 
         Args:
-            peraturan_id: ID peraturan
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            peraturan_id: ID of peraturan
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            List dari ayat dictionaries
+            List of ayat dictionaries
         """
         select_query = """
         SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,
@@ -154,15 +154,15 @@ class AyatRepository:
         self, bab_id: int, skip: int = 0, limit: int = 1000
     ) -> List[Dict[str, Any]]:
         """
-        Get list ayat untuk bab spesifik
+        Get list of ayats for specific bab
 
         Args:
-            bab_id: ID bab
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            bab_id: ID of bab
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            List dari ayat dictionaries
+            List of ayat dictionaries
         """
         select_query = """
         SELECT id, nomor_ayat, konten_ayat, urutan, metadata, pasal_id, bab_id, peraturan_id,

@@ -1,6 +1,6 @@
 """
-Repository untuk Tabel Pasal
-CRUD operations untuk tabel pasal
+Repository for Pasal Table
+CRUD operations for pasal table
 """
 
 from typing import List, Dict, Optional, Any
@@ -28,25 +28,25 @@ logger = logging.getLogger(__name__)
 
 
 # ========================================
-# Repository Class untuk Pasal
+# Repository Class for Pasal
 # ========================================
 
 
 class PasalRepository:
-    """Repository class untuk tabel pasal"""
+    """Repository class for pasal table"""
 
     async def create(self, pasal_data: Dict[str, Any]) -> int:
         """
-        Create pasal baru di database
+        Create new pasal in database
 
         Args:
-            pasal_data: Dictionary data pasal
+            pasal_data: Dictionary of pasal data
 
         Returns:
-            ID pasal yang dibuat
+            ID of created pasal
 
         Raises:
-            Exception: Jika gagal membuat pasal
+            Exception: If failed to create pasal
         """
         insert_query = """
         INSERT INTO pasals (
@@ -92,10 +92,10 @@ class PasalRepository:
         Get pasal by ID
 
         Args:
-            pasal_id: ID pasal
+            pasal_id: ID of pasal
 
         Returns:
-            Dictionary data pasal atau None jika tidak ditemukan
+            Dictionary of pasal data or None if not found
         """
         select_query = """
         SELECT id, peraturan_id, bab_id, nomor_pasal, judul_pasal,
@@ -111,18 +111,18 @@ class PasalRepository:
         self, peraturan_id: str, bab_id: Optional[int] = None, skip: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
         """
-        Get list pasal by peraturan_id atau bab_id dengan pagination
+        Get list of pasals by peraturan_id or bab_id with pagination
 
         Args:
-            peraturan_id: ID peraturan
+            peraturan_id: ID of peraturan
             bab_id: Filter by bab_id
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            Dictionary dengan total, skip, limit, dan items
+            Dictionary with total, skip, limit, and items
         """
-        # Build query dengan prepared statements
+        # Build query with prepared statements
         conditions = ["peraturan_id = $1"]
         params = [peraturan_id]
 
@@ -169,13 +169,13 @@ class PasalRepository:
         Update pasal
 
         Args:
-            pasal_id: ID pasal
-            update_data: Dictionary data untuk update
+            pasal_id: ID of pasal
+            update_data: Dictionary of data for update
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
-        # Build SET clause dengan prepared statements
+        # Build SET clause with prepared statements
         allowed_fields = [
             "bab_id",
             "nomor_pasal",
@@ -220,10 +220,10 @@ class PasalRepository:
         Delete pasal
 
         Args:
-            pasal_id: ID pasal
+            pasal_id: ID of pasal
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
         delete_query = "DELETE FROM pasals WHERE id = $1"
 
@@ -240,18 +240,18 @@ class PasalRepository:
         self, query: str, peraturan_id: str, skip: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
         """
-        Search pasal dalam peraturan spesifik menggunakan full-text search
+        Search pasals in specific peraturan using full-text search
 
         Args:
-            query: Search query (sudah disanitasi)
-            peraturan_id: ID peraturan
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            query: Search query (already sanitized)
+            peraturan_id: ID of peraturan
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            Dictionary dengan total, skip, limit, dan items
+            Dictionary with total, skip, limit, and items
         """
-        # Sanitize query untuk tsquery
+        # Sanitize query for tsquery
         tsquery = sanitize_search_query(query)
 
         search_query = """

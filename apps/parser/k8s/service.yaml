@@ -6,7 +6,8 @@ metadata:
   labels:
     app: parser-api
 spec:
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerClass: tailscale
   ports:
     - port: 8000
       targetPort: 8000

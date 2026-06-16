@@ -1,6 +1,6 @@
 """
-Main Entry Point untuk Parser API
-FastAPI application untuk parsing PDF dari peraturan.go.id
+Main Entry Point for Parser API
+FastAPI application for parsing PDFs from peraturan.go.id
 """
 
 from fastapi import FastAPI
@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Fix Python path untuk import modules
+# Fix Python path for module imports
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -35,11 +35,11 @@ from db import init_db_pool, close_db_pool
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan context manager untuk startup dan shutdown
+    Lifespan context manager for startup and shutdown
 
     Tasks:
-    - Startup: Inisialisasi database connection pool
-    - Shutdown: Tutup database connection pool
+    - Startup: Initialize database connection pool
+    - Shutdown: Close database connection pool
     """
     # Startup
     try:
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 # Initialize FastAPI app
 app = FastAPI(
     title="Peraturan Parser API",
-    description="HTTP Server untuk parsing PDF dari peraturan.go.id dengan struktur bab, pasal, ayat",
+    description="HTTP Server for parsing PDFs from peraturan.go.id with bab, pasal, ayat structure",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -90,7 +90,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,14 +100,14 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 
 
-# Root endpoint untuk cek API
+# Root endpoint to check API
 @app.get("/", tags=["Root"])
 async def root():
     """
-    Root endpoint untuk mengecek API
+    Root endpoint to check API
 
     Returns:
-        Message API dan dokumentasi
+        API message and documentation
     """
     return {
         "name": "Peraturan Parser API",

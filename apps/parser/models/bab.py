@@ -1,6 +1,6 @@
 """
-Pydantic Models untuk Tabel Bab
-Models untuk validation dan serialization tabel bab saja
+Pydantic Models for Bab Table
+Models for bab table validation and serialization only
 """
 
 from pydantic import BaseModel, Field
@@ -9,27 +9,27 @@ from datetime import datetime
 
 
 # ========================================
-# Models untuk Bab
+# Models for Bab
 # ========================================
 
 
 class BabBase(BaseModel):
-    """Base model untuk Bab"""
+    """Base model for Bab"""
 
-    peraturan_id: str = Field(..., description="Foreign key ke tabel peraturan")
-    nomor_bab: str = Field(..., min_length=1, description="Nomor bab (I, II, III, dll)")
-    judul_bab: Optional[str] = Field(None, description="Judul bab")
-    urutan: int = Field(..., ge=0, description="Urutan bab dalam peraturan")
+    peraturan_id: str = Field(..., description="Foreign key to peraturan table")
+    nomor_bab: str = Field(..., min_length=1, description="Bab number (I, II, III, etc.)")
+    judul_bab: Optional[str] = Field(None, description="Bab title")
+    urutan: int = Field(..., ge=0, description="Bab order within peraturan")
 
 
 class BabCreate(BabBase):
-    """Model untuk create bab baru"""
+    """Model for creating new bab"""
 
     pass
 
 
 class BabUpdate(BaseModel):
-    """Model untuk update bab"""
+    """Model for updating bab"""
 
     nomor_bab: Optional[str] = Field(None, min_length=1)
     judul_bab: Optional[str] = Field(None)
@@ -37,92 +37,92 @@ class BabUpdate(BaseModel):
 
 
 class BabInDB(BabBase):
-    """Model untuk bab di database"""
+    """Model for bab in database"""
 
     id: int = Field(..., description="Auto-increment ID")
-    created_at: datetime = Field(default_factory=datetime.now, description="Waktu bab dibuat")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Waktu bab diupdate")
+    created_at: datetime = Field(default_factory=datetime.now, description="Time bab was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="Time bab was updated")
 
     class Config:
         from_attributes = True
 
 
 class BabResponse(BabInDB):
-    """Model untuk response API bab"""
+    """Model for bab API response"""
 
     pass
 
 
 class BabWithPasalCount(BabResponse):
-    """Model untuk bab dengan count pasal"""
+    """Model for bab with pasal count"""
 
-    total_pasal: int = Field(0, description="Total pasal dalam bab")
+    total_pasal: int = Field(0, description="Total pasal in bab")
 
 
 class BabWithPeraturanInfo(BabResponse):
-    """Model untuk bab dengan info peraturan"""
+    """Model for bab with peraturan info"""
 
-    judul_peraturan: Optional[str] = Field(None, description="Judul peraturan")
-    nomor_peraturan: str = Field(..., description="Nomor peraturan")
-    tahun_peraturan: int = Field(..., description="Tahun peraturan")
-    kategori_peraturan: str = Field(..., description="Kategori peraturan")
-    jenis_peraturan: Optional[str] = Field(None, description="Jenis peraturan")
+    judul_peraturan: Optional[str] = Field(None, description="Peraturan title")
+    nomor_peraturan: str = Field(..., description="Peraturan number")
+    tahun_peraturan: int = Field(..., description="Peraturan year")
+    kategori_peraturan: str = Field(..., description="Peraturan category")
+    jenis_peraturan: Optional[str] = Field(None, description="Peraturan type")
 
 
 # ========================================
-# Models untuk List dan Filter
+# Models for List and Filter
 # ========================================
 
 
 class BabListResponse(BaseModel):
-    """Model untuk list bab response"""
+    """Model for bab list response"""
 
-    total: int = Field(..., description="Total jumlah bab")
-    peraturan_id: str = Field(..., description="ID peraturan")
-    items: List[BabResponse] = Field(..., description="List bab")
+    total: int = Field(..., description="Total bab count")
+    peraturan_id: str = Field(..., description="Peraturan ID")
+    items: List[BabResponse] = Field(..., description="List of bab")
 
 
 class BabFilter(BaseModel):
-    """Model untuk filter/query bab"""
+    """Model for bab filter/query"""
 
-    skip: int = Field(0, ge=0, description="Offset untuk pagination")
-    limit: int = Field(50, ge=1, le=100, description="Limit hasil per page")
+    skip: int = Field(0, ge=0, description="Offset for pagination")
+    limit: int = Field(50, ge=1, le=100, description="Result limit per page")
 
 
 class AyatNode(BaseModel):
-    """Model untuk ayat dalam struktur tree"""
+    """Model for ayat in tree structure"""
 
-    id: int = Field(..., description="ID ayat")
-    nomor_ayat: str = Field(..., description="Nomor ayat")
-    konten_ayat: str = Field(..., description="Konten ayat")
-    urutan: int = Field(..., description="Urutan ayat")
+    id: int = Field(..., description="Ayat ID")
+    nomor_ayat: str = Field(..., description="Ayat number")
+    konten_ayat: str = Field(..., description="Ayat content")
+    urutan: int = Field(..., description="Ayat order")
 
     class Config:
         from_attributes = True
 
 
 class PasalNode(BaseModel):
-    """Model untuk pasal dalam struktur tree"""
+    """Model for pasal in tree structure"""
 
-    id: int = Field(..., description="ID pasal")
-    nomor_pasal: str = Field(..., description="Nomor pasal")
-    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
-    konten_pasal: str = Field(..., description="Konten pasal")
-    urutan: int = Field(..., description="Urutan pasal")
-    ayat_list: List[AyatNode] = Field(default_factory=list, description="List ayat dalam pasal")
+    id: int = Field(..., description="Pasal ID")
+    nomor_pasal: str = Field(..., description="Pasal number")
+    judul_pasal: Optional[str] = Field(None, description="Pasal title")
+    konten_pasal: str = Field(..., description="Pasal content")
+    urutan: int = Field(..., description="Pasal order")
+    ayat_list: List[AyatNode] = Field(default_factory=list, description="List of ayat in pasal")
 
     class Config:
         from_attributes = True
 
 
 class BabNode(BaseModel):
-    """Model untuk bab dalam struktur tree (nested dalam peraturan)"""
+    """Model for bab in tree structure (nested within peraturan)"""
 
-    id: int = Field(..., description="ID bab")
-    nomor_bab: str = Field(..., description="Nomor bab")
-    judul_bab: Optional[str] = Field(None, description="Judul bab")
-    urutan: int = Field(..., description="Urutan bab")
-    pasal_list: List[PasalNode] = Field(default_factory=list, description="List pasal dalam bab")
+    id: int = Field(..., description="Bab ID")
+    nomor_bab: str = Field(..., description="Bab number")
+    judul_bab: Optional[str] = Field(None, description="Bab title")
+    urutan: int = Field(..., description="Bab order")
+    pasal_list: List[PasalNode] = Field(default_factory=list, description="List of pasal in bab")
 
     class Config:
         from_attributes = True

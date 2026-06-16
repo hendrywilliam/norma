@@ -1,6 +1,6 @@
 """
-API Routes untuk Parser
-API routes untuk trigger parsing, cek status, dan query peraturan, bab, pasal, ayat
+API Routes for Parser
+API routes to trigger parsing, check status, and query regulations, chapters, articles, verses
 """
 
 import os
@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
 
-# Import models dari folder models/ yang sudah dipisah
+# Import models from separate models/ folder
 from models.peraturan import (
     PeraturanBase,
     PeraturanCreate,
@@ -98,7 +98,7 @@ class StatusResponse(BaseModel):
     processed_items: int = 0
 
 
-# PeraturanFullResponse yang extend dari model di peraturan.py
+# PeraturanFullResponse that extends from model in peraturan.py
 class PeraturanFullResponse(PeraturanFullResponseModel):
     bab_list: List[BabWithPasalCount] = []
     pasal_list: List[PasalWithAyatCount] = []
@@ -112,13 +112,13 @@ class PeraturanFullResponse(PeraturanFullResponseModel):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint untuk monitoring"""
+    """Health check endpoint for monitoring"""
     return HealthResponse(status="healthy", timestamp=datetime.now(), version="0.1.0")
 
 
 @router.get("/status", response_model=StatusResponse)
 async def get_status():
-    """Get status parsing terakhir"""
+    """Get latest parsing status"""
     from parser.status import get_parse_status
 
     status_data = get_parse_status()
@@ -135,29 +135,29 @@ async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks
     """Trigger AI parsing process
 
     Args:
-        request: Parse request dengan parameter:
-        - url: URL spesifik atau kosong untuk semua peraturan
-        - api_key: GLM API key (wajib)
+        request: Parse request with parameters:
+        - url: Specific URL or empty for all regulations
+        - api_key: GLM API key (required)
         - model: GLM model (default: GLM-4.6V)
         - concurrency: Concurrent page processing (default: 3)
 
     Flow:
-        1. Scrape HTML → ambil metadata (judul, nomor, tahun, pdf_url)
-        2. Download PDF dari pdf_url
+        1. Scrape HTML → get metadata (title, number, year, pdf_url)
+        2. Download PDF from pdf_url
         3. Convert PDF pages → Images (base64)
         4. Send to GLM-4V vision → Extract BAB, Pasal, Ayat
         5. Save to Database
 
     Returns:
-        ParseResponse dengan status job
+        ParseResponse with job status
     """
     from parser.status import get_parse_status
 
-    # Cek apakah parsing sedang berjalan
+    # Check if parsing is currently running
     status = get_parse_status()
     if status["is_running"] and not request.force:
         raise HTTPException(
-            status_code=400, detail="Parsing sedang berjalan. Gunakan force=true untuk override."
+            status_code=400, detail="Parsing is currently running. Use force=true to override."
         )
 
     # Generate job ID
@@ -166,19 +166,19 @@ async def trigger_parse(request: ParseRequest, background_tasks: BackgroundTasks
     # Add background task
     background_tasks.add_task(run_parse_task, request, job_id)
 
-    # Estimasi waktu berdasarkan request
+    # Estimated time based on request
     estimated_time = estimate_parse_time(request)
 
     return ParseResponse(
         status="queued",
-        message=f"AI Parsing task di-queue: {request.url if request.url else 'semua peraturan'}",
+        message=f"AI Parsing task queued: {request.url if request.url else 'all regulations'}",
         job_id=job_id,
         estimated_time=estimated_time,
     )
 
 
 # ========================================
-# Peraturan Endpoints (Read-only untuk Parser)
+# Peraturan Endpoints (Read-only for Parser)
 # ========================================
 
 
@@ -192,19 +192,19 @@ async def list_peraturan(
     status: Optional[str] = None,
     search: Optional[str] = None,
 ):
-    """List semua peraturan di database dengan filter
+    """List all regulations in database with filters
 
     Args:
-        skip: Offset untuk pagination
-        limit: Limit hasil per page
-        category: Filter kategori
-        year: Filter tahun
-        jenis: Filter jenis peraturan
-        status: Filter status peraturan
-        search: Search string di judul/nomor
+        skip: Offset for pagination
+        limit: Limit results per page
+        category: Filter by category
+        year: Filter by year
+        jenis: Filter by regulation type
+        status: Filter by regulation status
+        search: Search string in title/number
 
     Returns:
-        List dari peraturan summary
+        List of regulation summaries
     """
     from repositories.peraturan import peraturan_repository
 
@@ -223,33 +223,33 @@ async def list_peraturan(
 
 @router.get("/peraturan/{peraturan_id}")
 async def get_peraturan_detail(peraturan_id: str):
-    """Get detail peraturan spesifik dengan count bab, pasal, ayat
+    """Get specific regulation detail with count of chapters, articles, verses
 
     Args:
-        peraturan_id: ID peraturan
+        peraturan_id: Regulation ID
 
     Returns:
-        Detail peraturan lengkap dengan count bab, pasal, ayat
+        Complete regulation detail with count of chapters, articles, verses
     """
     from repositories.peraturan import peraturan_repository
 
     peraturan = await peraturan_repository.get_by_id(peraturan_id)
 
     if not peraturan:
-        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Regulation not found")
 
     return peraturan
 
 
 @router.get("/peraturan/{peraturan_id}/full", response_model=PeraturanFullResponse)
 async def get_peraturan_full(peraturan_id: str):
-    """Get peraturan lengkap dengan semua bab, pasals, dan ayats
+    """Get complete regulation with all chapters, articles, and verses
 
     Args:
-        peraturan_id: ID peraturan
+        peraturan_id: Regulation ID
 
     Returns:
-        PeraturanFullResponse dengan peraturan, bab_list, pasal_list, ayat_list
+        PeraturanFullResponse with regulation, bab_list, pasal_list, ayat_list
     """
     from repositories.peraturan import peraturan_repository
     from repositories.bab import bab_repository
@@ -258,7 +258,7 @@ async def get_peraturan_full(peraturan_id: str):
 
     peraturan = await peraturan_repository.get_by_id(peraturan_id)
     if not peraturan:
-        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Regulation not found")
 
     bab_result = await bab_repository.get_list(peraturan_id)
     pasal_result = await pasal_repository.get_list(peraturan_id)
@@ -272,7 +272,7 @@ async def get_peraturan_full(peraturan_id: str):
     }
 
     if not result:
-        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Regulation not found")
 
     return PeraturanFullResponse(
         peraturan=PeraturanDetail(**result["peraturan"]),
@@ -284,57 +284,57 @@ async def get_peraturan_full(peraturan_id: str):
 
 @router.post("/peraturan/{peraturan_id}/reparse")
 async def reparse_peraturan(peraturan_id: str, background_tasks: BackgroundTasks):
-    """Trigger re-parse untuk peraturan spesifik
+    """Trigger re-parse for specific regulation
 
     Args:
-        peraturan_id: ID peraturan untuk di-reparse
+        peraturan_id: Regulation ID to be re-parsed
 
     Returns:
-        ParseResponse dengan status job
+        ParseResponse with job status
     """
     from repositories.peraturan import peraturan_repository
 
-    # Cek apakah peraturan ada
+    # Check if regulation exists
     peraturan = await peraturan_repository.get_by_id(peraturan_id)
     if not peraturan:
-        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Regulation not found")
 
     job_id = f"reparse_{peraturan_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    # Add background task untuk re-parse
+    # Add background task for re-parse
     background_tasks.add_task(run_reparse_task, peraturan_id, job_id)
 
     return ParseResponse(
         status="queued",
-        message=f"Re-parse task di-queue: {peraturan['judul']}",
+        message=f"Re-parse task queued: {peraturan['judul']}",
         job_id=job_id,
-        estimated_time=60,  # Estimasi 1 menit untuk re-parse
+        estimated_time=60,  # Estimated 1 minute for re-parse
     )
 
 
 @router.delete("/peraturan/{peraturan_id}")
 async def delete_peraturan(peraturan_id: str):
-    """Hapus peraturan dan semua data terkait (bab, pasal, ayat)
+    """Delete regulation and all related data (chapters, articles, verses)
 
     Args:
-        peraturan_id: ID peraturan yang akan dihapus
+        peraturan_id: Regulation ID to be deleted
 
     Returns:
-        Dictionary dengan status penghapusan
+        Dictionary with deletion status
     """
     from repositories.peraturan import peraturan_repository
     from repositories.bab import bab_repository
     from repositories.pasal import pasal_repository
     from repositories.ayat import ayat_repository
 
-    # Cek apakah peraturan ada
+    # Check if regulation exists
     peraturan = await peraturan_repository.get_by_id(peraturan_id)
     if not peraturan:
-        raise HTTPException(status_code=404, detail="Peraturan tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Regulation not found")
 
-    # Hapus semua ayat terkait pasal milik peraturan ini
-    # Note: Karena ada foreign key CASCADE, hapus peraturan akan otomatis hapus bab, pasal, ayat
-    # Tapi kita hapus manual untuk memastikan
+    # Delete all verses related to articles belonging to this regulation
+    # Note: Because of foreign key CASCADE, deleting regulation will automatically delete chapters, articles, verses
+    # But we delete manually to ensure
 
     try:
         # Get all pasal for this peraturan
@@ -351,25 +351,25 @@ async def delete_peraturan(peraturan_id: str):
         deleted_bab = await bab_repository.delete_by_peraturan(peraturan_id)
         logger.info(f"Deleted {deleted_bab} bab for peraturan {peraturan_id}")
 
-        # Delete peraturan (CASCADE akan hapus sisa data)
+        # Delete peraturan (CASCADE will delete remaining data)
         deleted = await peraturan_repository.delete(peraturan_id)
 
         if deleted:
             logger.info(f"Peraturan {peraturan_id} deleted successfully")
             return {
                 "status": "success",
-                "message": f"Peraturan '{peraturan.get('judul', peraturan_id)}' berhasil dihapus",
+                "message": f"Regulation '{peraturan.get('judul', peraturan_id)}' successfully deleted",
                 "deleted_peraturan_id": peraturan_id,
                 "deleted_bab_count": deleted_bab,
             }
         else:
-            raise HTTPException(status_code=500, detail="Gagal menghapus peraturan")
+            raise HTTPException(status_code=500, detail="Failed to delete regulation")
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting peraturan {peraturan_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error menghapus peraturan: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting regulation: {str(e)}")
 
 
 # ========================================
@@ -379,15 +379,15 @@ async def delete_peraturan(peraturan_id: str):
 
 @router.get("/peraturan/{peraturan_id}/bab", response_model=List[BabResponse])
 async def list_bab(peraturan_id: str, skip: int = 0, limit: int = 50):
-    """List semua bab untuk peraturan spesifik dengan pagination
+    """List all chapters for specific regulation with pagination
 
     Args:
-        peraturan_id: ID peraturan
-        skip: Offset untuk pagination
-        limit: Limit hasil per page
+        peraturan_id: Regulation ID
+        skip: Offset for pagination
+        limit: Limit results per page
 
     Returns:
-        List dari bab untuk peraturan
+        List of chapters for regulation
     """
     from repositories.bab import bab_repository
 
@@ -398,36 +398,36 @@ async def list_bab(peraturan_id: str, skip: int = 0, limit: int = 50):
 
 @router.get("/peraturan/{peraturan_id}/bab/{bab_id}", response_model=BabResponse)
 async def get_bab_detail(bab_id: int):
-    """Get detail bab spesifik
+    """Get specific chapter detail
 
     Args:
-        bab_id: ID bab
+        bab_id: Chapter ID
 
     Returns:
-        Detail bab lengkap
+        Complete chapter detail
     """
     from repositories.bab import bab_repository
 
     bab = await bab_repository.get_by_id(bab_id)
 
     if not bab:
-        raise HTTPException(status_code=404, detail="Bab tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
     return bab
 
 
 @router.get("/peraturan/{peraturan_id}/bab/{bab_id}/pasals", response_model=List[PasalResponse])
 async def list_pasal_by_bab(peraturan_id: str, bab_id: int, skip: int = 0, limit: int = 50):
-    """List semua pasal dalam bab spesifik dengan pagination
+    """List all articles in specific chapter with pagination
 
     Args:
-        peraturan_id: ID peraturan
-        bab_id: ID bab
-        skip: Offset untuk pagination
-        limit: Limit hasil per page
+        peraturan_id: Regulation ID
+        bab_id: Chapter ID
+        skip: Offset for pagination
+        limit: Limit results per page
 
     Returns:
-        List dari pasal dalam bab
+        List of articles in chapter
     """
     from repositories.pasal import pasal_repository
 
@@ -447,16 +447,16 @@ async def list_pasal_by_bab(peraturan_id: str, bab_id: int, skip: int = 0, limit
 async def list_pasal(
     peraturan_id: str, bab_id: Optional[int] = None, skip: int = 0, limit: int = 50
 ):
-    """List semua pasal untuk peraturan spesifik (atau dalam bab spesifik) dengan pagination
+    """List all articles for specific regulation (or in specific chapter) with pagination
 
     Args:
-        peraturan_id: ID peraturan
-        bab_id: Optional ID bab untuk filter
-        skip: Offset untuk pagination
-        limit: Limit hasil per page
+        peraturan_id: Regulation ID
+        bab_id: Optional chapter ID for filtering
+        skip: Offset for pagination
+        limit: Limit results per page
 
     Returns:
-        List dari pasal dengan info bab dan peraturan
+        List of articles with chapter and regulation info
     """
     from repositories.pasal import pasal_repository
 
@@ -469,37 +469,37 @@ async def list_pasal(
 
 @router.get("/peraturan/{peraturan_id}/pasals/{pasal_id}", response_model=PasalWithAyatCount)
 async def get_pasal_detail(peraturan_id: str, pasal_id: int):
-    """Get detail pasal spesifik dengan count ayat
+    """Get specific article detail with verse count
 
     Args:
-        peraturan_id: ID peraturan
-        pasal_id: ID pasal
+        peraturan_id: Regulation ID
+        pasal_id: Article ID
 
     Returns:
-        Detail pasal lengkap dengan count ayat
+        Complete article detail with verse count
     """
     from repositories.pasal import pasal_repository
 
     pasal = await pasal_repository.get_by_id(pasal_id)
 
     if not pasal:
-        raise HTTPException(status_code=404, detail="Pasal tidak ditemukan")
+        raise HTTPException(status_code=404, detail="Article not found")
 
     return PasalWithAyatCount(**pasal)
 
 
 @router.get("/peraturan/{peraturan_id}/pasals/{pasal_id}/ayats", response_model=List[AyatResponse])
 async def list_ayat_by_pasal(peraturan_id: str, pasal_id: int, skip: int = 0, limit: int = 50):
-    """List semua ayat dalam pasal spesifik dengan pagination
+    """List all verses in specific article with pagination
 
     Args:
-        peraturan_id: ID peraturan
-        pasal_id: ID pasal
-        skip: Offset untuk pagination
-        limit: Limit hasil per page
+        peraturan_id: Regulation ID
+        pasal_id: Article ID
+        skip: Offset for pagination
+        limit: Limit results per page
 
     Returns:
-        List dari ayat dalam pasal
+        List of verses in article
     """
     from repositories.ayat import ayat_repository
 
@@ -526,13 +526,13 @@ async def trigger_ai_parse(
     """Trigger AI-based PDF parsing using GLM-4V vision model
 
     Args:
-        peraturan_id: ID peraturan yang akan di-parse
+        peraturan_id: Regulation ID to be parsed
         background_tasks: FastAPI background tasks
         model: GLM model to use (default: GLM-4.6V)
         concurrency: Number of concurrent page processing
 
     Returns:
-        ParseResponse dengan status job
+        ParseResponse with job status
     """
     from parser.status import get_parse_status
 
@@ -540,12 +540,12 @@ async def trigger_ai_parse(
     if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="GLM_API_KEY tidak ditemukan di environment variables",
+            detail="GLM_API_KEY not found in environment variables",
         )
 
     status = get_parse_status()
     if status["is_running"]:
-        raise HTTPException(status_code=400, detail="Parsing sedang berjalan. Coba lagi nanti.")
+        raise HTTPException(status_code=400, detail="Parsing is currently running. Try again later.")
 
     job_id = f"ai_parse_{peraturan_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -572,7 +572,7 @@ async def trigger_ai_parse(
 
     return ParseResponse(
         status="queued",
-        message=f"AI parsing task di-queue untuk peraturan {peraturan_id}",
+        message=f"AI parsing task queued for regulation {peraturan_id}",
         job_id=job_id,
         estimated_time=120,
     )
@@ -594,15 +594,15 @@ async def trigger_ai_parse_from_url(
     Args:
         pdf_url: URL to PDF file
         background_tasks: FastAPI background tasks
-        judul: Judul peraturan (optional)
-        nomor: Nomor peraturan (optional)
-        tahun: Tahun peraturan (optional)
-        kategori: Kategori peraturan (default: UU)
+        judul: Regulation title (optional)
+        nomor: Regulation number (optional)
+        tahun: Regulation year (optional)
+        kategori: Regulation category (default: UU)
         model: GLM model to use
         concurrency: Number of concurrent page processing
 
     Returns:
-        ParseResponse dengan status job
+        ParseResponse with job status
     """
     from parser.status import get_parse_status
 
@@ -610,12 +610,12 @@ async def trigger_ai_parse_from_url(
     if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="GLM_API_KEY tidak ditemukan di environment variables",
+            detail="GLM_API_KEY not found in environment variables",
         )
 
     status = get_parse_status()
     if status["is_running"]:
-        raise HTTPException(status_code=400, detail="Parsing sedang berjalan. Coba lagi nanti.")
+        raise HTTPException(status_code=400, detail="Parsing is currently running. Try again later.")
 
     import hashlib
 
@@ -654,7 +654,7 @@ async def trigger_ai_parse_from_url(
 
     return ParseResponse(
         status="queued",
-        message=f"AI parsing task di-queue untuk PDF dari URL",
+        message=f"AI parsing task queued for PDF from URL",
         job_id=job_id,
         estimated_time=120,
     )
@@ -720,7 +720,7 @@ async def run_ai_parse_task(
     model: str,
     concurrency: int,
 ):
-    """Background task untuk AI parsing"""
+    """Background task for AI parsing"""
     from parser.ai_agent import parse_pdf_with_ai
     from parser.status import update_parse_status
     from repositories.peraturan import peraturan_repository
@@ -739,7 +739,7 @@ async def run_ai_parse_task(
 
         pdf_url = peraturan.get("pdf_url")
         if not pdf_url:
-            raise ValueError("Tidak ada PDF URL")
+            raise ValueError("No PDF URL found")
 
         update_parse_status(
             job_id=job_id, current_task=f"AI Parsing: {peraturan.get('judul', 'Unknown')}"
@@ -911,7 +911,7 @@ async def run_ai_parse_from_url_task(
     model: str,
     concurrency: int,
 ):
-    """Background task untuk AI parsing from URL"""
+    """Background task for AI parsing from URL"""
     from parser.ai_agent import parse_pdf_with_ai
     from parser.status import update_parse_status
     import time
@@ -967,12 +967,12 @@ async def run_ai_parse_from_url_task(
 
 
 # ========================================
-# Helper Functions untuk Parsing
+# Helper Functions for Parsing
 # ========================================
 
 
 async def run_parse_task(request: ParseRequest, job_id: str):
-    """Background task untuk menjalankan AI parsing dengan GLM-4V"""
+    """Background task to run AI parsing with GLM-4V"""
     from parser.status import (
         start_parsing,
         update_parse_status,
@@ -990,26 +990,26 @@ async def run_parse_task(request: ParseRequest, job_id: str):
         start_parsing(job_id)
         update_parse_status(job_id=job_id, current_task="Scraping URLs")
         logger.info(
-            f"[{job_id}] Mulai parsing: {request.url if request.url else 'semua peraturan'}"
+            f"[{job_id}] Starting parsing: {request.url if request.url else 'all regulations'}"
         )
 
         # Get API key from environment
         api_key = os.getenv("GLM_API_KEY")
         if not api_key:
-            raise ValueError("GLM_API_KEY tidak ditemukan di environment variables")
+            raise ValueError("GLM_API_KEY not found in environment variables")
 
-        # 1. Scrape URLs dari peraturan.go.id
+        # 1. Scrape URLs from peraturan.go.id
         urls = await scrape_peraturan(url=request.url, category=request.category, year=request.year)
 
-        logger.info(f"[{job_id}] Ditemukan {len(urls)} URL untuk di-parse")
+        logger.info(f"[{job_id}] Found {len(urls)} URLs to parse")
         update_parse_status(job_id=job_id, total_items=len(urls))
 
         if not urls:
-            logger.warning(f"[{job_id}] Tidak ada URL ditemukan")
+            logger.warning(f"[{job_id}] No URLs found")
             finish_parsing(job_id=job_id, success=True)
             return
 
-        # 2. Download dan parse setiap PDF dengan AI
+        # 2. Download and parse each PDF with AI
         success_count = 0
         failed_count = 0
 
@@ -1022,15 +1022,15 @@ async def run_parse_task(request: ParseRequest, job_id: str):
 
                 pdf_url = url_info.get("pdf_url")
                 if not pdf_url:
-                    logger.warning(f"[{job_id}] Tidak ada PDF URL untuk {url_info.get('judul')}")
+                    logger.warning(f"[{job_id}] No PDF URL for {url_info.get('judul')}")
                     failed_count += 1
                     continue
 
-                # Format data peraturan dari scraper
+                # Format peraturan data from scraper
                 peraturan_data = {"id": generate_peraturan_id(url_info), **url_info}
                 peraturan_id = peraturan_data["id"]
 
-                logger.info(f"[{job_id}] Mengdownload PDF: {pdf_url}")
+                logger.info(f"[{job_id}] Downloading PDF: {pdf_url}")
 
                 # AI-based parsing with GLM-4V
                 ai_result = await parse_pdf_with_ai(
@@ -1135,15 +1135,15 @@ async def run_parse_task(request: ParseRequest, job_id: str):
                 update_progress(job_id=job_id, current=idx, total=len(urls))
 
                 logger.info(
-                    f"[{job_id}] Berhasil parse {idx}/{len(urls)}: "
+                    f"[{job_id}] Successfully parsed {idx}/{len(urls)}: "
                     f"{len(bab_list)} BAB, {len(pasal_list)} Pasal, {len(ayat_list)} Ayat"
                 )
 
             except Exception as e:
                 failed_count += 1
-                logger.error(f"[{job_id}] Gagal parse {url_info.get('judul', 'Unknown')}: {e}")
+                logger.error(f"[{job_id}] Failed to parse {url_info.get('judul', 'Unknown')}: {e}")
 
-        # 3. Update status final
+        # 3. Update final status
         update_parse_status(
             job_id=job_id,
             is_running=False,
@@ -1153,17 +1153,17 @@ async def run_parse_task(request: ParseRequest, job_id: str):
             current_task=None,
         )
 
-        logger.info(f"[{job_id}] Parsing selesai. Success: {success_count}, Failed: {failed_count}")
+        logger.info(f"[{job_id}] Parsing completed. Success: {success_count}, Failed: {failed_count}")
 
     except Exception as e:
         from parser.status import finish_parsing
 
         finish_parsing(job_id=job_id, success=False, error=str(e))
-        logger.error(f"[{job_id}] Parsing gagal: {e}")
+        logger.error(f"[{job_id}] Parsing failed: {e}")
 
 
 async def run_reparse_task(peraturan_id: str, job_id: str):
-    """Background task untuk re-parse peraturan spesifik"""
+    """Background task to re-parse specific regulation"""
     from parser.status import update_parse_status, finish_parsing
     from repositories.peraturan import peraturan_repository
     from repositories.bab import bab_repository
@@ -1174,23 +1174,23 @@ async def run_reparse_task(peraturan_id: str, job_id: str):
     try:
         update_parse_status(job_id=job_id, is_running=True)
 
-        # Get peraturan dari database
+        # Get regulation from database
         peraturan = await peraturan_repository.get_by_id(peraturan_id)
 
-        logger.info(f"[{job_id}] Mulai re-parse: {peraturan['judul']}")
+        logger.info(f"[{job_id}] Starting re-parse: {peraturan['judul']}")
 
         # Get PDF URL
         pdf_url = peraturan.get("pdf_url")
         if not pdf_url:
-            raise ValueError("Tidak ada PDF URL")
+            raise ValueError("No PDF URL found")
 
         # Re-parse PDF
         update_parse_status(job_id=job_id, current_task=f"Re-parsing: {peraturan['judul']}")
 
         pdf_result = await parse_peraturan_complete(pdf_source=pdf_url, peraturan_id=peraturan_id)
 
-        # Format data untuk database
-        # Hanya update bab, pasals, ayats (jangan update peraturan info)
+        # Format data for database
+        # Only update chapters, articles, verses (don't update regulation info)
         bab_list = pdf_result["bab"]
         pasal_list = pdf_result["pasal"]
         ayat_list = pdf_result["ayat"]
@@ -1198,7 +1198,7 @@ async def run_reparse_task(peraturan_id: str, job_id: str):
         # Delete old bab, pasals, ayats for this peraturan
         await bab_repository.delete_by_peraturan(peraturan_id)
 
-        # Re-save ke database (akan update existing bab, pasals, ayats)
+        # Re-save to database (will update existing chapters, articles, verses)
         for bab in bab_list:
             await bab_repository.create(bab)
 
@@ -1208,7 +1208,7 @@ async def run_reparse_task(peraturan_id: str, job_id: str):
         for ayat in ayat_list:
             await ayat_repository.create(ayat)
 
-        # Update reparse count dan last reparse
+        # Update reparse count and last reparse
         await peraturan_repository.update(
             peraturan_id,
             {
@@ -1229,24 +1229,24 @@ async def run_reparse_task(peraturan_id: str, job_id: str):
             job_id=job_id, is_running=False, last_success=datetime.now(), total_parsed=1
         )
 
-        logger.info(f"[{job_id}] Re-parse selesai: {peraturan['judul']}")
+        logger.info(f"[{job_id}] Re-parse completed: {peraturan['judul']}")
 
     except Exception as e:
         finish_parsing(job_id=job_id, success=False, error=str(e))
-        logger.error(f"[{job_id}] Re-parse gagal: {e}")
+        logger.error(f"[{job_id}] Re-parse failed: {e}")
 
 
 def generate_peraturan_id(peraturan_info: dict) -> str:
-    """Generate unique ID untuk peraturan"""
+    """Generate unique ID for regulation"""
     import hashlib
     import re
 
-    # Clean nomor untuk ID
+    # Clean number for ID
     nomor = re.sub(r"[^a-zA-Z0-9]", "_", peraturan_info.get("nomor", ""))
     tahun = peraturan_info.get("tahun", 0)
     kategori = peraturan_info.get("kategori", "UU")
 
-    # Generate hash dari URL untuk uniqueness
+    # Generate hash from URL for uniqueness
     url = peraturan_info.get("url", "")
     url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
 
@@ -1254,11 +1254,11 @@ def generate_peraturan_id(peraturan_info: dict) -> str:
 
 
 def estimate_parse_time(request: ParseRequest) -> int:
-    """Estimasi waktu parsing dalam detik"""
+    """Estimate parsing time in seconds"""
     if request.url:
-        return 60  # 1 menit untuk URL spesifik
+        return 60  # 1 minute for specific URL
 
     if request.category or request.year:
-        return 600  # 10 menit untuk dengan filter
+        return 600  # 10 minutes with filter
 
-    return 3600  # 1 jam untuk semua peraturan
+    return 3600  # 1 hour for all regulations

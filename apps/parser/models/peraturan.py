@@ -1,6 +1,6 @@
 """
-Data Models untuk Peraturan
-Pydantic models untuk validation dan serialization tabel peraturan saja
+Data Models for Peraturan
+Pydantic models for peraturan table validation and serialization only
 """
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,35 +9,35 @@ from datetime import datetime
 
 
 class PeraturanBase(BaseModel):
-    """Base model untuk Peraturan"""
+    """Base model for Peraturan"""
 
-    judul: Optional[str] = Field(None, min_length=1, description="Judul peraturan")
-    nomor: str = Field(..., min_length=1, description="Nomor peraturan")
-    tahun: int = Field(..., gt=1900, lt=2100, description="Tahun peraturan")
+    judul: Optional[str] = Field(None, min_length=1, description="Peraturan title")
+    nomor: str = Field(..., min_length=1, description="Peraturan number")
+    tahun: int = Field(..., gt=1900, lt=2100, description="Peraturan year")
     kategori: str = Field(
-        ..., min_length=1, description="Kategori peraturan (UU, PP, Perpres, dll)"
+        ..., min_length=1, description="Peraturan category (UU, PP, Perpres, etc.)"
     )
-    url: str = Field(..., min_length=1, description="URL sumber dari peraturan.go.id")
-    pdf_url: Optional[str] = Field(None, description="URL PDF peraturan")
-    jenis_peraturan: Optional[str] = Field(None, description="Jenis peraturan lengkap")
-    pemrakarsa: Optional[str] = Field(None, description="Pemrakarsa peraturan")
-    tentang: Optional[str] = Field(None, description="Topik/judul peraturan")
-    tempat_penetapan: Optional[str] = Field(None, description="Tempat peraturan ditetapkan")
-    tanggal_ditetapkan: Optional[datetime] = Field(None, description="Tanggal peraturan ditetapkan")
-    pejabat_menetapkan: Optional[str] = Field(None, description="Pejabat yang menetapkan peraturan")
-    status_peraturan: Optional[str] = Field("Berlaku", description="Status peraturan")
-    jumlah_dilihat: Optional[int] = Field(0, ge=0, description="Jumlah dilihat")
-    jumlah_download: Optional[int] = Field(0, ge=0, description="Jumlah didownload")
-    tanggal_disahkan: Optional[datetime] = Field(None, description="Tanggal peraturan disahkan")
+    url: str = Field(..., min_length=1, description="Source URL from peraturan.go.id")
+    pdf_url: Optional[str] = Field(None, description="Peraturan PDF URL")
+    jenis_peraturan: Optional[str] = Field(None, description="Full peraturan type")
+    pemrakarsa: Optional[str] = Field(None, description="Peraturan sponsor")
+    tentang: Optional[str] = Field(None, description="Peraturan topic/title")
+    tempat_penetapan: Optional[str] = Field(None, description="Place peraturan was enacted")
+    tanggal_ditetapkan: Optional[datetime] = Field(None, description="Date peraturan was enacted")
+    pejabat_menetapkan: Optional[str] = Field(None, description="Official who enacted the peraturan")
+    status_peraturan: Optional[str] = Field("Berlaku", description="Peraturan status")
+    jumlah_dilihat: Optional[int] = Field(0, ge=0, description="View count")
+    jumlah_download: Optional[int] = Field(0, ge=0, description="Download count")
+    tanggal_disahkan: Optional[datetime] = Field(None, description="Date peraturan was ratified")
     tanggal_diundangkan: Optional[datetime] = Field(
-        None, description="Tanggal peraturan diundangkan"
+        None, description="Date peraturan was promulgated"
     )
-    deskripsi: Optional[str] = Field(None, description="Deskripsi singkat peraturan")
+    deskripsi: Optional[str] = Field(None, description="Brief peraturan description")
 
     @field_validator("kategori")
     @classmethod
     def validate_kategori(cls, v):
-        """Validasi kategori peraturan"""
+        """Validate peraturan category"""
         kategori_valid = [
             "UU",
             "PP",
@@ -54,26 +54,26 @@ class PeraturanBase(BaseModel):
             "Lainnya",
         ]
         if v not in kategori_valid:
-            raise ValueError(f"Kategori harus salah dari: {', '.join(kategori_valid)}")
+            raise ValueError(f"Category must be one of: {', '.join(kategori_valid)}")
         return v
 
     @field_validator("url", "pdf_url")
     @classmethod
     def validate_url(cls, v):
-        """Validasi URL format"""
+        """Validate URL format"""
         if v and not (v.startswith("http://") or v.startswith("https://")):
-            raise ValueError("URL harus dimulai dengan http:// atau https://")
+            raise ValueError("URL must start with http:// or https://")
         return v
 
 
 class PeraturanCreate(PeraturanBase):
-    """Model untuk create peraturan baru"""
+    """Model for creating new peraturan"""
 
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata tambahan")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
 
 class PeraturanUpdate(BaseModel):
-    """Model untuk update peraturan"""
+    """Model for updating peraturan"""
 
     judul: Optional[str] = Field(None, min_length=1)
     nomor: Optional[str] = Field(None, min_length=1)
@@ -97,28 +97,28 @@ class PeraturanUpdate(BaseModel):
 
 
 class PeraturanInDB(PeraturanBase):
-    """Model untuk peraturan di database"""
+    """Model for peraturan in database"""
 
-    id: str = Field(..., description="Unique ID peraturan")
+    id: str = Field(..., description="Unique peraturan ID")
     metadata: Optional[Dict[str, Any]] = None
-    created_at: datetime = Field(default_factory=datetime.now, description="Waktu record dibuat")
-    updated_at: datetime = Field(default_factory=datetime.now, description="Waktu record diupdate")
-    parsed_at: Optional[datetime] = Field(None, description="Waktu parsing terakhir")
-    reparse_count: int = Field(0, description="Berapa kali peraturan di-reparse")
-    last_reparse_at: Optional[datetime] = Field(None, description="Waktu terakhir reparse")
+    created_at: datetime = Field(default_factory=datetime.now, description="Time record was created")
+    updated_at: datetime = Field(default_factory=datetime.now, description="Time record was updated")
+    parsed_at: Optional[datetime] = Field(None, description="Last parsing time")
+    reparse_count: int = Field(0, description="Number of times peraturan was re-parsed")
+    last_reparse_at: Optional[datetime] = Field(None, description="Last reparse time")
 
     class Config:
-        from_attributes = True  # Untuk ORM mode
+        from_attributes = True  # For ORM mode
 
 
 class PeraturanResponse(PeraturanInDB):
-    """Model untuk response API"""
+    """Model for API response"""
 
     pass
 
 
 class PeraturanSummary(BaseModel):
-    """Model untuk summary peraturan (tanpa konten lengkap)"""
+    """Model for peraturan summary (without full content)"""
 
     id: str
     judul: Optional[str]
@@ -137,7 +137,7 @@ class PeraturanSummary(BaseModel):
 
 
 class PeraturanDetail(BaseModel):
-    """Model untuk detail peraturan dengan count bab, pasal, ayat"""
+    """Model for peraturan detail with bab, pasal, ayat counts"""
 
     id: str
     judul: Optional[str]
@@ -162,22 +162,22 @@ class PeraturanDetail(BaseModel):
 
 
 class PeraturanFilter(BaseModel):
-    """Model untuk filter/query peraturan"""
+    """Model for peraturan filter/query"""
 
-    category: Optional[str] = Field(None, description="Filter kategori")
-    year: Optional[int] = Field(None, description="Filter tahun")
-    jenis: Optional[str] = Field(None, description="Filter jenis peraturan")
-    status: Optional[str] = Field(None, description="Filter status peraturan")
-    search: Optional[str] = Field(None, description="Search string di judul/nomor")
-    skip: int = Field(0, ge=0, description="Offset untuk pagination")
-    limit: int = Field(20, ge=1, le=100, description="Limit hasil per page")
-    sort_by: Optional[str] = Field(None, description="Field untuk sorting")
-    sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Urutan sorting")
+    category: Optional[str] = Field(None, description="Filter by category")
+    year: Optional[int] = Field(None, description="Filter by year")
+    jenis: Optional[str] = Field(None, description="Filter by peraturan type")
+    status: Optional[str] = Field(None, description="Filter by peraturan status")
+    search: Optional[str] = Field(None, description="Search string in title/number")
+    skip: int = Field(0, ge=0, description="Offset for pagination")
+    limit: int = Field(20, ge=1, le=100, description="Result limit per page")
+    sort_by: Optional[str] = Field(None, description="Field for sorting")
+    sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Sort order")
 
     @field_validator("sort_by")
     @classmethod
     def validate_sort_by(cls, v):
-        """Validasi field yang bisa di-sort"""
+        """Validate sortable fields"""
         if v:
             sort_fields = [
                 "judul",
@@ -189,48 +189,48 @@ class PeraturanFilter(BaseModel):
                 "parsed_at",
             ]
             if v not in sort_fields:
-                raise ValueError(f"Sort by harus salah dari: {', '.join(sort_fields)}")
+                raise ValueError(f"Sort by must be one of: {', '.join(sort_fields)}")
         return v
 
 
 class PeraturanListResponse(BaseModel):
-    """Model untuk list peraturan response"""
+    """Model for peraturan list response"""
 
-    total: int = Field(..., description="Total jumlah peraturan")
-    skip: int = Field(..., description="Offset untuk pagination")
-    limit: int = Field(..., description="Limit hasil per page")
-    items: List[PeraturanResponse] = Field(..., description="List peraturan")
+    total: int = Field(..., description="Total peraturan count")
+    skip: int = Field(..., description="Offset for pagination")
+    limit: int = Field(..., description="Result limit per page")
+    items: List[PeraturanResponse] = Field(..., description="List of peraturan")
 
 
 class PeraturanMetadata(BaseModel):
-    """Model untuk metadata peraturan dari PDF"""
+    """Model for peraturan metadata from PDF"""
 
-    page_count: int = Field(0, description="Total halaman PDF")
-    char_count: int = Field(0, description="Total karakter konten")
-    bab_count: int = Field(0, description="Total bab yang diekstrak")
-    pasal_count: int = Field(0, description="Total pasal yang diekstrak")
-    ayat_count: int = Field(0, description="Total ayat yang diekstrak")
-    keywords: List[str] = Field(default_factory=list, description="Keywords yang diekstrak")
+    page_count: int = Field(0, description="Total PDF pages")
+    char_count: int = Field(0, description="Total content characters")
+    bab_count: int = Field(0, description="Total bab extracted")
+    pasal_count: int = Field(0, description="Total pasal extracted")
+    ayat_count: int = Field(0, description="Total ayat extracted")
+    keywords: List[str] = Field(default_factory=list, description="Extracted keywords")
 
     class Config:
         from_attributes = True
 
 
 class ParseResult(BaseModel):
-    """Model untuk hasil parsing PDF"""
+    """Model for PDF parsing result"""
 
-    success: bool = Field(..., description="Apakah parsing berhasil")
-    peraturan_id: Optional[str] = Field(None, description="ID peraturan yang diparse")
-    error: Optional[str] = Field(None, description="Error message jika gagal")
-    parsed_data: Optional[Dict[str, Any]] = Field(None, description="Data hasil parsing")
-    metadata: Optional[PeraturanMetadata] = Field(None, description="Metadata parsing")
+    success: bool = Field(..., description="Whether parsing succeeded")
+    peraturan_id: Optional[str] = Field(None, description="ID of parsed peraturan")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    parsed_data: Optional[Dict[str, Any]] = Field(None, description="Parsed data")
+    metadata: Optional[PeraturanMetadata] = Field(None, description="Parsing metadata")
 
     class Config:
         from_attributes = True
 
 
 class PeraturanFullResponse(BaseModel):
-    """Model untuk response peraturan lengkap dengan bab, pasal, dan ayat"""
+    """Model for full peraturan response with bab, pasal, and ayat"""
 
     peraturan: PeraturanDetail
     bab_count: int = Field(0, description="Total bab")
@@ -240,48 +240,48 @@ class PeraturanFullResponse(BaseModel):
 
 
 class AyatNode(BaseModel):
-    """Model untuk ayat dalam struktur tree"""
+    """Model for ayat in tree structure"""
 
-    id: int = Field(..., description="ID ayat")
-    nomor_ayat: str = Field(..., description="Nomor ayat")
-    konten_ayat: str = Field(..., description="Konten ayat")
-    urutan: int = Field(..., description="Urutan ayat")
+    id: int = Field(..., description="Ayat ID")
+    nomor_ayat: str = Field(..., description="Ayat number")
+    konten_ayat: str = Field(..., description="Ayat content")
+    urutan: int = Field(..., description="Ayat order")
 
     class Config:
         from_attributes = True
 
 
 class PasalNode(BaseModel):
-    """Model untuk pasal dalam struktur tree"""
+    """Model for pasal in tree structure"""
 
-    id: int = Field(..., description="ID pasal")
-    nomor_pasal: str = Field(..., description="Nomor pasal")
-    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
-    konten_pasal: str = Field(..., description="Konten pasal")
-    urutan: int = Field(..., description="Urutan pasal")
-    ayat_list: List["AyatNode"] = Field(default_factory=list, description="List ayat dalam pasal")
+    id: int = Field(..., description="Pasal ID")
+    nomor_pasal: str = Field(..., description="Pasal number")
+    judul_pasal: Optional[str] = Field(None, description="Pasal title")
+    konten_pasal: str = Field(..., description="Pasal content")
+    urutan: int = Field(..., description="Pasal order")
+    ayat_list: List["AyatNode"] = Field(default_factory=list, description="List of ayat in pasal")
 
     class Config:
         from_attributes = True
 
 
 class BabNode(BaseModel):
-    """Model untuk bab dalam struktur tree"""
+    """Model for bab in tree structure"""
 
-    id: int = Field(..., description="ID bab")
-    nomor_bab: str = Field(..., description="Nomor bab")
-    judul_bab: Optional[str] = Field(None, description="Judul bab")
-    urutan: int = Field(..., description="Urutan bab")
-    pasal_list: List["PasalNode"] = Field(default_factory=list, description="List pasal dalam bab")
+    id: int = Field(..., description="Bab ID")
+    nomor_bab: str = Field(..., description="Bab number")
+    judul_bab: Optional[str] = Field(None, description="Bab title")
+    urutan: int = Field(..., description="Bab order")
+    pasal_list: List["PasalNode"] = Field(default_factory=list, description="List of pasal in bab")
 
     class Config:
         from_attributes = True
 
 
 class PeraturanTreeResponse(BaseModel):
-    """Model untuk response peraturan dengan struktur tree (nested)
+    """Model for peraturan response with tree structure (nested)
 
-    Struktur tree:
+    Tree structure:
     - Peraturan
       ├── bab_list: List[BabNode]
       │   └── BabNode
@@ -295,10 +295,10 @@ class PeraturanTreeResponse(BaseModel):
 
     peraturan: PeraturanDetail
     bab_list: List[BabNode] = Field(
-        default_factory=list, description="List bab dengan pasal nested"
+        default_factory=list, description="List of bab with nested pasal"
     )
     pasal_tanpa_bab_list: List[PasalNode] = Field(
-        default_factory=list, description="List pasal tanpa bab (standalone)"
+        default_factory=list, description="List of pasal without bab (standalone)"
     )
 
     class Config:

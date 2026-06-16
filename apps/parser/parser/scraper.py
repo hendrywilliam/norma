@@ -1,7 +1,7 @@
 """
-Scraper untuk peraturan.go.id
-Scraping list peraturan, detail, dan download PDF
-Mengambil data lengkap sesuai dengan database structure baru
+Scraper for peraturan.go.id
+Scraping regulation list, details, and downloading PDF
+Collects complete data according to the new database structure
 """
 
 import aiohttp
@@ -24,7 +24,7 @@ HEADERS = {
 }
 
 # Rate limiting
-REQUEST_DELAY = 1  # delay antar request dalam detik
+REQUEST_DELAY = 1  # delay between requests in seconds
 
 
 async def scrape_peraturan(
@@ -35,17 +35,17 @@ async def scrape_peraturan(
     session: Optional[aiohttp.ClientSession] = None,
 ) -> List[Dict]:
     """
-    Scrape list peraturan dari peraturan.go.id
+    Scrape regulation list from peraturan.go.id
 
     Args:
-        url: URL spesifik untuk scraping (optional)
-        category: Filter kategori (UU, PP, Perpres, dll)
-        year: Filter tahun
-        limit: Batas jumlah peraturan yang di-scrape
+        url: Specific URL for scraping (optional)
+        category: Filter category (UU, PP, Perpres, etc.)
+        year: Filter year
+        limit: Maximum number of regulations to scrape
         session: aiohttp ClientSession (optional)
 
     Returns:
-        List dictionary berisi info peraturan dengan field lengkap
+        List of dictionaries containing regulation info with complete fields
     """
     if url:
         return await scrape_single_url(url, session)
@@ -60,16 +60,16 @@ async def scrape_list_peraturan(
     session: Optional[aiohttp.ClientSession] = None,
 ) -> List[Dict]:
     """
-    Scrape list peraturan berdasarkan filter
+    Scrape regulation list based on filters
 
     Args:
-        category: Kategori peraturan
-        year: Tahun peraturan
-        limit: Batas jumlah hasil
+        category: Regulation category
+        year: Regulation year
+        limit: Maximum number of results
         session: aiohttp ClientSession
 
     Returns:
-        List dictionary info peraturan
+        List of regulation info dictionaries
     """
     results = []
     page = 1
@@ -83,7 +83,7 @@ async def scrape_list_peraturan(
 
     try:
         while should_continue:
-            # Build URL untuk list peraturan
+            # Build URL for regulation list
             search_url = f"{BASE_URL}/search"
             params = {"page": page}
 
@@ -127,7 +127,7 @@ async def scrape_list_peraturan(
                 should_continue = False
                 continue
 
-            # Extract data dari setiap item
+            # Extract data from each item
             for item in peraturan_items:
                 peraturan_data = extract_peraturan_info(item)
                 if peraturan_data:
@@ -172,14 +172,14 @@ async def scrape_single_url(
     url: str, session: Optional[aiohttp.ClientSession] = None
 ) -> List[Dict]:
     """
-    Scrape peraturan dari URL spesifik
+    Scrape regulation from a specific URL
 
     Args:
-        url: URL peraturan
+        url: Regulation URL
         session: aiohttp ClientSession (optional)
 
     Returns:
-        List dengan satu element (dictionary info peraturan)
+        List with one element (regulation info dictionary)
     """
     close_session = False
 
@@ -199,7 +199,7 @@ async def scrape_single_url(
 
         soup = BeautifulSoup(html, "html.parser")
 
-        # Extract data dari table struktur HTML peraturan.go.id
+        # Extract data from peraturan.go.id HTML table structure
         peraturan_data = extract_peraturan_detail(soup)
         peraturan_data["url"] = url
         logger.info("Peraturan datanya:", peraturan_data)
@@ -218,19 +218,19 @@ async def scrape_single_url(
 
 def extract_peraturan_detail(soup: BeautifulSoup) -> Dict:
     """
-    Extract detail peraturan dari HTML soup berdasarkan struktur table peraturan.go.id
+    Extract regulation detail from HTML soup based on peraturan.go.id table structure
 
-    Struktur HTML yang diharapkan:
+    Expected HTML structure:
     - <section id="description">
-    - <div class="detail_title_1"><h1>Judul Peraturan</h1></div>
+    - <div class="detail_title_1"><h1>Regulation Title</h1></div>
     - <table class="table caption-top">
-        <tr><th>Nama Field</th><td>Nilai</td></tr>
+        <tr><th>Field Name</th><td>Value</td></tr>
 
     Args:
-        soup: BeautifulSoup object dari HTML page
+        soup: BeautifulSoup object from the HTML page
 
     Returns:
-        Dictionary berisi data peraturan
+        Dictionary containing regulation data
     """
     data = {
         "judul": None,
@@ -255,12 +255,12 @@ def extract_peraturan_detail(soup: BeautifulSoup) -> Dict:
     }
 
     try:
-        # Extract judul dari h1 di dalam detail_title_1
+        # Extract title from h1 inside detail_title_1
         h1_element = soup.find("h1")
         if h1_element:
             data["judul"] = h1_element.get_text(strip=True)
 
-        # Mapping field names dari HTML ke data keys
+        # Map field names from HTML to data keys
         field_mapping = {
             "jenis/bentuk peraturan": "jenis_peraturan",
             "pemrakarsa": "pemrakarsa",
@@ -319,7 +319,7 @@ def extract_peraturan_detail(soup: BeautifulSoup) -> Dict:
                             break
         logger.info(data)
 
-        # Set kategori dari jenis_peraturan
+        # Set kategori from jenis_peraturan
         if data["jenis_peraturan"]:
             data["kategori"] = data["jenis_peraturan"]
 
@@ -334,11 +334,11 @@ async def download_pdf(pdf_url: str, save_path: Optional[str] = None) -> bytes:
     Download PDF file
 
     Args:
-        pdf_url: URL PDF
-        save_path: Path untuk menyimpan file (optional)
+        pdf_url: PDF URL
+        save_path: Path to save the file (optional)
 
     Returns:
-        PDF content sebagai bytes
+        PDF content as bytes
     """
     try:
         logger.info(f"Downloading PDF: {pdf_url}")
@@ -364,16 +364,16 @@ async def download_pdf(pdf_url: str, save_path: Optional[str] = None) -> bytes:
 
 def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
     """
-    Extract info peraturan dari item HTML
+    Extract regulation info from an HTML item
 
     Args:
-        item: BeautifulSoup element untuk item peraturan
+        item: BeautifulSoup element for the regulation item
 
     Returns:
-        Dictionary info peraturan atau None
+        Regulation info dictionary or None
     """
     try:
-        # Extract judul dan URL - try multiple selectors
+        # Extract title and URL - try multiple selectors
         title_element = (
             item.find("a", class_=lambda x: x and "judul" in x.lower())
             or item.find("a", class_=lambda x: x and "title" in x.lower())
@@ -419,7 +419,7 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
         judul = title_element.get_text(strip=True)
         detail_url = urljoin(BASE_URL, title_element.get("href", ""))
 
-        # Extract nomor dan tahun
+        # Extract number and year
         nomor_element = item.find("span", class_="nomor")
         nomor = nomor_element.get_text(strip=True) if nomor_element else ""
 
@@ -428,11 +428,11 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
             extract_year_from_text(tahun_element.get_text(strip=True)) if tahun_element else None
         )
 
-        # Extract kategori
+        # Extract category
         kategori_element = item.find("span", class_="kategori")
         kategori = kategori_element.get_text(strip=True) if kategori_element else ""
 
-        # Extract tanggal
+        # Extract date
         tanggal_element = item.find("span", class_="tanggal")
         tanggal = tanggal_element.get_text(strip=True) if tanggal_element else ""
 
@@ -450,7 +450,7 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
             "kategori": kategori,
             "tanggal_disahkan": tanggal,
             "pdf_url": pdf_url,
-            # Default values untuk field baru (akan diupdate dari detail page)
+            # Default values for new fields (will be updated from detail page)
             "jenis_peraturan": None,
             "pemrakarsa": None,
             "tentang": None,
@@ -471,7 +471,7 @@ def extract_peraturan_info(item: BeautifulSoup) -> Optional[Dict]:
 def extract_detail_text(
     soup: BeautifulSoup, tags: List[str], classes: Optional[List[str]] = None
 ) -> str:
-    """Extract text dari element HTML dengan multiple selector options"""
+    """Extract text from HTML element with multiple selector options"""
     try:
         if classes:
             for tag in tags:
@@ -490,9 +490,9 @@ def extract_detail_text(
 
 
 def extract_year_from_text(text: str) -> Optional[int]:
-    """Extract tahun dari string text"""
+    """Extract year from text string"""
     try:
-        # Cari pattern tahun 4 digit
+        # Find 4-digit year pattern
         match = re.search(r"\b(19|20)\d{2}\b", text)
         if match:
             return int(match.group())
@@ -502,7 +502,7 @@ def extract_year_from_text(text: str) -> Optional[int]:
 
 
 def parse_date(date_string: str) -> Optional[datetime.date]:
-    """Parse tanggal dari string format Indonesia ke datetime.date object"""
+    """Parse date from Indonesian format string to datetime.date object"""
     try:
         if not date_string:
             return None
@@ -510,7 +510,7 @@ def parse_date(date_string: str) -> Optional[datetime.date]:
         # Remove whitespace
         date_string = date_string.strip()
 
-        # Pattern tanggal Indonesia: 02 Januari 2026
+        # Indonesian date pattern: 02 Januari 2026
         months_indo = {
             "januari": 1,
             "februari": 2,
@@ -526,7 +526,7 @@ def parse_date(date_string: str) -> Optional[datetime.date]:
             "desember": 12,
         }
 
-        # Match pattern: DD Bulan YYYY
+        # Match pattern: DD Month YYYY
         match = re.match(r"(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})", date_string, re.IGNORECASE)
         if match:
             day = int(match.group(1))
@@ -550,7 +550,7 @@ def parse_date(date_string: str) -> Optional[datetime.date]:
 
 
 def extract_count_from_text(text: str) -> int:
-    """Extract number dari text (untuk jumlah dilihat/download)"""
+    """Extract number from text (for view/download count)"""
     try:
         if not text:
             return 0
@@ -569,14 +569,14 @@ def extract_count_from_text(text: str) -> int:
 
 
 def extract_pdf_url(soup: BeautifulSoup) -> Optional[str]:
-    """Extract URL PDF dari detail page"""
+    """Extract PDF URL from detail page"""
     try:
-        # Cari link PDF
+        # Find PDF link
         pdf_link = soup.find("a", class_="download-pdf")
         if pdf_link:
             return urljoin(BASE_URL, pdf_link.get("href", ""))
 
-        # Alternatif: cari link dengan text "Download"
+        # Alternative: find link with text "Download"
         for a in soup.find_all("a"):
             if "download" in a.get_text().lower() and "pdf" in a.get("href", "").lower():
                 return urljoin(BASE_URL, a.get("href", ""))

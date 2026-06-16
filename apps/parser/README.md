@@ -347,9 +347,8 @@ kubernetes/
 ├── namespace.yaml              # Parser namespace (norma-parser)
 ├── configmap.yaml              # Environment configuration
 ├── secret.yaml                 # Parser secrets
-├── parser-deployment.yaml      # Parser deployment
-├── parser-service.yaml         # Parser service
-├── ingress.yaml                # Ingress config
+├── deployment.yaml      # Parser deployment
+├── service.yaml         # Parser service
 ├── hpa.yaml                    # Horizontal Pod Autoscaler
 ├── pvc.yaml                    # Persistent Volume Claims
 ├── postgres-statefulset.yaml   # PostgreSQL StatefulSet
@@ -374,9 +373,8 @@ kubectl apply -f kubernetes/postgres-service.yaml
 kubectl apply -f kubernetes/pvc.yaml
 
 # Deploy Parser
-kubectl apply -f kubernetes/parser-deployment.yaml
-kubectl apply -f kubernetes/parser-service.yaml
-kubectl apply -f kubernetes/ingress.yaml
+kubectl apply -f kubernetes/deployment.yaml
+kubectl apply -f kubernetes/service.yaml
 kubectl apply -f kubernetes/hpa.yaml
 
 # Check status

@@ -1,6 +1,6 @@
 """
-Repository untuk Tabel Peraturan
-CRUD operations untuk tabel peraturan
+Repository for Peraturan Table
+CRUD operations for peraturan table
 """
 
 from typing import List, Dict, Optional, Any
@@ -15,22 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 # ========================================
-# Repository Class untuk Peraturan
+# Repository Class for Peraturan
 # ========================================
 
 
 class PeraturanRepository:
-    """Repository class untuk tabel peraturan"""
+    """Repository class for peraturan table"""
 
     async def create(self, peraturan_data: Dict[str, Any]) -> str:
         """
-        Create peraturan baru di database
+        Create new peraturan in database
 
         Args:
-            peraturan_data: Dictionary data peraturan
+            peraturan_data: Dictionary of peraturan data
 
         Returns:
-            ID peraturan yang dibuat
+            ID of created peraturan
         """
         insert_query = """
         INSERT INTO peraturan (
@@ -111,10 +111,10 @@ class PeraturanRepository:
         Get peraturan by ID
 
         Args:
-            peraturan_id: ID peraturan
+            peraturan_id: ID of peraturan
 
         Returns:
-            Dictionary data peraturan atau None jika tidak ditemukan
+            Dictionary of peraturan data or None if not found
         """
         select_query = """
         SELECT id, judul, nomor, tahun, kategori, url, pdf_url,
@@ -142,23 +142,23 @@ class PeraturanRepository:
         sort_order: str = "desc",
     ) -> Dict[str, Any]:
         """
-        Get list peraturan dengan filter dan pagination
+        Get list of peraturans with filter and pagination
 
         Args:
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
-            category: Filter kategori
-            year: Filter tahun
-            jenis: Filter jenis peraturan
-            status: Filter status peraturan
+            skip: Offset for pagination
+            limit: Limit results per page
+            category: Category filter
+            year: Year filter
+            jenis: Peraturan type filter
+            status: Peraturan status filter
             search: Search string
-            sort_by: Field untuk sorting
-            sort_order: Urutan sorting (asc/desc)
+            sort_by: Field for sorting
+            sort_order: Sort order (asc/desc)
 
         Returns:
-            Dictionary dengan total, skip, limit, dan items
+            Dictionary with total, skip, limit, and items
         """
-        # Build query dengan prepared statements
+        # Build query with prepared statements
         conditions = []
         params = []
 
@@ -187,7 +187,7 @@ class PeraturanRepository:
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        # Validate sort_by untuk mencegah SQL injection
+        # Validate sort_by to prevent SQL injection
         valid_sort_fields = [
             "judul",
             "nomor",
@@ -247,13 +247,13 @@ class PeraturanRepository:
         Update peraturan
 
         Args:
-            peraturan_id: ID peraturan
-            update_data: Dictionary data untuk update
+            peraturan_id: ID of peraturan
+            update_data: Dictionary of data for update
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
-        # Build SET clause dengan prepared statements
+        # Build SET clause with prepared statements
         allowed_fields = [
             "judul",
             "nomor",
@@ -313,10 +313,10 @@ class PeraturanRepository:
         Delete peraturan
 
         Args:
-            peraturan_id: ID peraturan
+            peraturan_id: ID of peraturan
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
         delete_query = "DELETE FROM peraturan WHERE id = $1"
 
@@ -331,17 +331,17 @@ class PeraturanRepository:
 
     async def search(self, query: str, skip: int = 0, limit: int = 20) -> Dict[str, Any]:
         """
-        Full-text search peraturan menggunakan PostgreSQL full-text search
+        Full-text search peraturans using PostgreSQL full-text search
 
         Args:
             query: Search query
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            Dictionary dengan total, skip, limit, dan items
+            Dictionary with total, skip, limit, and items
         """
-        # Sanitize query untuk tsquery
+        # Sanitize query for tsquery
         tsquery = sanitize_search_query(query)
 
         search_sql = """
@@ -393,10 +393,10 @@ class PeraturanRepository:
 
     async def get_stats(self) -> Dict[str, Any]:
         """
-        Get statistics peraturan
+        Get peraturan statistics
 
         Returns:
-            Dictionary dengan statistik peraturan
+            Dictionary with peraturan statistics
         """
         stats_query = """
         SELECT

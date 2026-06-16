@@ -1,6 +1,6 @@
 """
-Repository untuk Tabel Bab
-CRUD operations untuk tabel bab
+Repository for Bab Table
+CRUD operations for bab table
 """
 
 from typing import List, Dict, Optional, Any
@@ -26,25 +26,25 @@ logger = logging.getLogger(__name__)
 
 
 # ========================================
-# Repository Class untuk Bab
+# Repository Class for Bab
 # ========================================
 
 
 class BabRepository:
-    """Repository class untuk tabel bab"""
+    """Repository class for bab table"""
 
     async def create(self, bab_data: Dict[str, Any]) -> int:
         """
-        Create bab baru di database
+        Create new bab in database
 
         Args:
-            bab_data: Dictionary data bab
+            bab_data: Dictionary of bab data
 
         Returns:
-            ID bab yang dibuat
+            ID of created bab
 
         Raises:
-            Exception: Jika gagal membuat bab
+            Exception: If failed to create bab
         """
         insert_query = """
         INSERT INTO bab (
@@ -83,10 +83,10 @@ class BabRepository:
         Get bab by ID
 
         Args:
-            bab_id: ID bab
+            bab_id: ID of bab
 
         Returns:
-            Dictionary data bab atau None jika tidak ditemukan
+            Dictionary of bab data or None if not found
         """
         select_query = """
         SELECT id, peraturan_id, nomor_bab, judul_bab, urutan,
@@ -100,15 +100,15 @@ class BabRepository:
 
     async def get_list(self, peraturan_id: str, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
         """
-        Get list bab by peraturan_id dengan pagination
+        Get list of babs by peraturan_id with pagination
 
         Args:
-            peraturan_id: ID peraturan
-            skip: Offset untuk pagination
-            limit: Limit hasil per page
+            peraturan_id: ID of peraturan
+            skip: Offset for pagination
+            limit: Limit results per page
 
         Returns:
-            Dictionary dengan total, skip, limit, dan items
+            Dictionary with total, skip, limit, and items
         """
         # Get total count
         count_query = "SELECT COUNT(*) FROM bab WHERE peraturan_id = $1"
@@ -147,13 +147,13 @@ class BabRepository:
         Update bab
 
         Args:
-            bab_id: ID bab
-            update_data: Dictionary data untuk update
+            bab_id: ID of bab
+            update_data: Dictionary of data for update
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
-        # Build SET clause dengan prepared statement
+        # Build SET clause with prepared statement
         allowed_fields = ["nomor_bab", "judul_bab", "urutan"]
         set_clauses = []
         params = []
@@ -191,10 +191,10 @@ class BabRepository:
         Delete bab
 
         Args:
-            bab_id: ID bab
+            bab_id: ID of bab
 
         Returns:
-            True jika berhasil, False jika tidak
+            True if successful, False otherwise
         """
         delete_query = "DELETE FROM bab WHERE id = $1"
 
@@ -209,13 +209,13 @@ class BabRepository:
 
     async def delete_by_peraturan(self, peraturan_id: str) -> int:
         """
-        Delete semua bab milik peraturan spesifik
+        Delete all babs belonging to specific peraturan
 
         Args:
-            peraturan_id: ID peraturan
+            peraturan_id: ID of peraturan
 
         Returns:
-            Jumlah bab yang dihapus
+            Number of deleted babs
         """
         delete_query = "DELETE FROM bab WHERE peraturan_id = $1"
 

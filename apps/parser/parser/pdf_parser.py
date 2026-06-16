@@ -1,5 +1,5 @@
 """
-PDF Parser untuk mengekstrak struktur peraturan (bab, pasal, ayat) dari PDF
+PDF Parser for extracting regulation structure (bab, pasal, ayat) from PDF
 """
 
 import pdfplumber
@@ -23,14 +23,14 @@ logger = logging.getLogger(__name__)
 
 async def download_pdf(url: str, session: Optional[aiohttp.ClientSession] = None) -> bytes:
     """
-    Download PDF dari URL danreturn sebagai bytes
+    Download PDF from URL and return as bytes
 
     Args:
-        url: URL PDF
+        url: PDF URL
         session: aiohttp ClientSession (optional)
 
     Returns:
-        PDF content sebagai bytes
+        PDF content as bytes
     """
     close_session = False
     if session is None:
@@ -208,26 +208,26 @@ async def parse_pdf(
     image_scale: float = 2.0,
 ) -> Dict:
     """
-    Parse PDF dan extract konten, metadata, dan struktur peraturan
+    Parse PDF and extract content, metadata, and regulation structure
 
     Args:
         pdf_source: PDF file path, URL, bytes, or file-like object
-        extract_images: Apakah extract images (default False) - for tables
-        convert_to_images: Apakah convert PDF pages to images (default False)
+        extract_images: Whether to extract images (default False) - for tables
+        convert_to_images: Whether to convert PDF pages to images (default False)
         image_output_dir: Directory for images (default: temp directory)
         image_scale: Scale factor for image quality (default: 2.0)
 
     Returns:
-        Dictionary berisi:
-        - text: Full text dari PDF
-        - pages: List text per halaman
-        - metadata: Metadata PDF
-        - structure: Struktur peraturan (bab, pasal, ayat)
-        - tables: List tables jika ada (opsional)
-        - images: List image info jika convert_to_images=True
-        - image_dir: Path to image directory jika convert_to_images=True
+        Dictionary containing:
+        - text: Full text from PDF
+        - pages: List of text per page
+        - metadata: PDF metadata
+        - structure: Regulation structure (bab, pasal, ayat)
+        - tables: List of tables if any (optional)
+        - images: List of image info if convert_to_images=True
+        - image_dir: Path to image directory if convert_to_images=True
     """
-    # Jika pdf_source adalah URL (string yang dimulai dengan http), download dulu
+    # If pdf_source is a URL (string starting with http), download first
     if isinstance(pdf_source, str) and (
         pdf_source.startswith("http://") or pdf_source.startswith("https://")
     ):
@@ -270,7 +270,7 @@ def _parse_pdf_sync(
     }
 
     try:
-        # Convert PDF to images jika diminta
+        # Convert PDF to images if requested
         if convert_to_images:
             logger.info("Converting PDF pages to images...")
 
@@ -297,13 +297,13 @@ def _parse_pdf_sync(
                 f"Converted {len(result['images'])} pages to images in {result['image_dir']}"
             )
 
-        # Parse PDF untuk text extraction
+        # Parse PDF for text extraction
         pdf_input = pdf_source
         if convert_to_images and isinstance(pdf_source, bytes):
-            # Jika sudah di-convert, gunakan bytes yang sama untuk text extraction
+            # If already converted, use same bytes for text extraction
             pdf_input = BytesIO(pdf_source)
         elif convert_to_images and hasattr(pdf_source, "read"):
-            # Reset stream jika sudah di-read
+            # Reset stream if already read
             pdf_source.seek(0)
             pdf_input = pdf_source
 
@@ -313,14 +313,14 @@ def _parse_pdf_sync(
             if not convert_to_images:
                 result["page_count"] = len(pdf.pages)
 
-            # Extract text per halaman
+            # Extract text per page
             full_text = []
             for page_num, page in enumerate(pdf.pages, 1):
                 try:
                     text = page.extract_text() or ""
                     text = clean_text(text)
 
-                    # Extract tables jika ada
+                    # Extract tables if any
                     tables = []
                     if extract_images:
                         tables = page.extract_tables()
@@ -329,7 +329,7 @@ def _parse_pdf_sync(
                                 [{"page": page_num, "table": table} for table in tables]
                             )
 
-                    # Simpan per halaman
+                    # Save per page
                     page_data = {"page": page_num, "text": text, "char_count": len(text)}
 
                     result["pages"].append(page_data)
@@ -341,10 +341,10 @@ def _parse_pdf_sync(
                     logger.warning(f"Error parsing page {page_num}: {e}")
                     result["pages"].append({"page": page_num, "text": "", "error": str(e)})
 
-            # Gabungkan semua text
+            # Combine all text
             result["text"] = "\n\n".join(full_text)
 
-            # Extract structure peraturan
+            # Extract regulation structure
             result["structure"] = extract_peraturan_structure(full_text)
 
             logger.info(
@@ -363,13 +363,13 @@ def _parse_pdf_sync(
 
 def extract_metadata(pdf: pdfplumber.PDF) -> Dict:
     """
-    Extract metadata dari PDF
+    Extract metadata from PDF
 
     Args:
         pdf: pdfplumber PDF object
 
     Returns:
-        Dictionary metadata
+        Metadata dictionary
     """
     metadata = {}
 
@@ -395,10 +395,10 @@ def extract_metadata(pdf: pdfplumber.PDF) -> Dict:
 
 def clean_text(text: str) -> str:
     """
-    Bersihkan text dari PDF
+    Clean text from PDF
 
     Args:
-        text: Raw text dari PDF
+        text: Raw text from PDF
 
     Returns:
         Cleaned text
@@ -409,16 +409,16 @@ def clean_text(text: str) -> str:
     # Remove extra whitespace
     text = re.sub(r"\s+", " ", text)
 
-    # Remove page numbers di akhir/awal line
+    # Remove page numbers at end/start of line
     text = re.sub(r"^\s*\d+\s*$", "", text, flags=re.MULTILINE)
 
-    # Remove headers/footers yang terlalu pendek
+    # Remove headers/footers that are too short
     lines = text.split("\n")
     cleaned_lines = []
 
     for line in lines:
         stripped = line.strip()
-        # Skip line yang terlalu pendek (mungkin page number atau noise)
+        # Skip lines that are too short (possibly page number or noise)
         if len(stripped) > 3:
             cleaned_lines.append(stripped)
 
@@ -427,16 +427,16 @@ def clean_text(text: str) -> str:
 
 def extract_peraturan_structure(text_lines: List[str]) -> Dict[str, List[Dict]]:
     """
-    Extract struktur peraturan (bab, pasal, ayat) dari text
+    Extract regulation structure (bab, pasal, ayat) from text
 
     Args:
-        text_lines: List text per halaman
+        text_lines: List of text per page
 
     Returns:
-        Dictionary dengan struktur:
-        - bab: List bab
-        - pasal: List pasal
-        - ayat: List ayat
+        Dictionary with structure:
+        - bab: List of bab
+        - pasal: List of pasal
+        - ayat: List of ayat
     """
     full_text = "\n\n".join(text_lines)
     lines = full_text.split("\n")
@@ -452,16 +452,16 @@ def extract_peraturan_structure(text_lines: List[str]) -> Dict[str, List[Dict]]:
     for line_num, line in enumerate(lines, 1):
         stripped = line.strip()
 
-        # Detect Bab (Roman numeral I, II, III, atau angka 1, 2, 3)
+        # Detect Bab (Roman numeral I, II, III, or number 1, 2, 3)
         bab_match = re.match(r"^(BAB|Bagian)\s+([IVXLC]+|\d+)", stripped, re.IGNORECASE)
         if bab_match:
             bab_type = bab_match.group(1).upper()
             bab_number = bab_match.group(2)
 
-            # Judul bab biasanya di line yang sama atau berikutnya
+            # Bab title usually on the same or next line
             judul_bab = stripped
             if len(bab_number) < 5:
-                # Cari judul di line berikutnya jika belum ada
+                # Look for title on the next line if not present yet
                 if line_num < len(lines):
                     next_line = lines[line_num].strip()
                     if next_line and not re.match(r"^BAB|Bagian", next_line, re.IGNORECASE):
@@ -483,10 +483,10 @@ def extract_peraturan_structure(text_lines: List[str]) -> Dict[str, List[Dict]]:
         if pasal_match:
             pasal_number = pasal_match.group(1)
 
-            # Judul pasal biasanya di line yang sama atau berikutnya
+            # Pasal title usually on the same or next line
             judul_pasal = stripped
             if f"Pasal {pasal_number}" in judul_pasal:
-                # Cari judul di line berikutnya
+                # Look for title on the next line
                 if line_num < len(lines):
                     next_line = lines[line_num].strip()
                     if next_line and not re.match(r"^Pasal", next_line):
@@ -530,39 +530,39 @@ def extract_peraturan_content_by_structure(
     text_lines: List[str], structure: Dict[str, List[Dict]]
 ) -> Dict[str, List[Dict]]:
     """
-    Extract konten lengkap untuk bab, pasal, dan ayat berdasarkan struktur
+    Extract complete content for bab, pasal, and ayat based on structure
 
     Args:
-        text_lines: List text per halaman
-        structure: Struktur peraturan (dari extract_peraturan_structure)
+        text_lines: List of text per page
+        structure: Regulation structure (from extract_peraturan_structure)
 
     Returns:
-        Dictionary dengan konten lengkap untuk bab, pasal, dan ayat
+        Dictionary with complete content for bab, pasal, and ayat
     """
     full_text = "\n\n".join(text_lines)
     lines = full_text.split("\n")
 
     result = {"bab": [], "pasal": [], "ayat": []}
 
-    # Extract konten bab
+    # Extract bab content
     for i, bab in enumerate(structure["bab"]):
         next_bab_line = (
             structure["bab"][i + 1]["line_num"] if i < len(structure["bab"]) - 1 else len(lines)
         )
 
-        # Extract text dari line bab sampai line bab berikutnya
+        # Extract text from bab line to the next bab line
         bab_lines = lines[bab["line_num"] - 1 : next_bab_line - 1]
         bab_content = "\n".join(bab_lines)
 
         result["bab"].append({**bab, "konten_bab": bab_content, "char_count": len(bab_content)})
 
-    # Extract konten pasal
+    # Extract pasal content
     for i, pasal in enumerate(structure["pasal"]):
         next_pasal_line = (
             structure["pasal"][i + 1]["line_num"] if i < len(structure["pasal"]) - 1 else len(lines)
         )
 
-        # Extract text dari line pasal sampai line pasal berikutnya
+        # Extract text from pasal line to the next pasal line
         pasal_lines = lines[pasal["line_num"] - 1 : next_pasal_line - 1]
         pasal_content = "\n".join(pasal_lines)
 
@@ -570,7 +570,7 @@ def extract_peraturan_content_by_structure(
             {**pasal, "konten_pasal": pasal_content, "char_count": len(pasal_content)}
         )
 
-    # Extract konten ayat (sudah di extract di extract_peraturan_structure)
+    # Extract ayat content (already extracted in extract_peraturan_structure)
     result["ayat"] = structure["ayat"]
 
     return result
@@ -578,22 +578,22 @@ def extract_peraturan_content_by_structure(
 
 def validate_pdf(pdf_source: Any) -> bool:
     """
-    Validate apakah file adalah PDF valid
+    Validate whether the file is a valid PDF
 
     Args:
-        pdf_source: PDF file path, bytes, atau file-like object
+        pdf_source: PDF file path, bytes, or file-like object
 
     Returns:
-        True jika valid, False jika tidak
+        True if valid, False otherwise
     """
     try:
         with pdfplumber.open(pdf_source) as pdf:
-            # Cek apakah ada halaman
+            # Check if there are any pages
             if len(pdf.pages) == 0:
                 logger.warning("PDF has no pages")
                 return False
 
-            # Cek apakah bisa extract text dari halaman pertama
+            # Check if text can be extracted from first page
             first_page_text = pdf.pages[0].extract_text()
             if not first_page_text:
                 logger.warning("Cannot extract text from first page")
@@ -608,14 +608,14 @@ def validate_pdf(pdf_source: Any) -> bool:
 
 async def parse_pdf_from_url(url: str, download_func: callable) -> Dict:
     """
-    Download dan parse PDF dari URL
+    Download and parse PDF from URL
 
     Args:
-        url: URL PDF
-        download_func: Function untuk download PDF (harus return bytes)
+        url: PDF URL
+        download_func: Function to download PDF (must return bytes)
 
     Returns:
-        Dictionary hasil parsing
+        Parsing result dictionary
     """
     try:
         logger.info(f"Downloading PDF from {url}")
@@ -633,7 +633,7 @@ async def parse_pdf_from_url(url: str, download_func: callable) -> Dict:
         # Parse PDF
         result = await parse_pdf(BytesIO(pdf_bytes))
 
-        # Add source URL ke result
+        # Add source URL to result
         result["source_url"] = url
 
         return result
@@ -645,17 +645,17 @@ async def parse_pdf_from_url(url: str, download_func: callable) -> Dict:
 
 def extract_keywords(text: str, min_freq: int = 2) -> List[str]:
     """
-    Extract keywords dari text peraturan
+    Extract keywords from regulation text
 
     Args:
-        text: Full text dari PDF
-        min_freq: Minimum frequency untuk keyword
+        text: Full text from PDF
+        min_freq: Minimum frequency for keyword
 
     Returns:
-        List keywords yang sering muncul
+        List of frequently occurring keywords
     """
     try:
-        # Tokenize dan hitung frequency
+        # Tokenize and count frequency
         words = re.findall(r"\b[A-Za-z]{4,}\b", text.lower())
 
         # Filter stop words (Indonesian)
@@ -710,23 +710,23 @@ async def parse_peraturan_complete(
     image_scale: float = 2.0,
 ) -> Dict[str, Any]:
     """
-    Parse PDF peraturan secara lengkap dengan struktur database-ready
+    Parse regulation PDF completely with database-ready structure
 
     Args:
-        pdf_source: PDF file path, bytes, atau file-like object
-        peraturan_id: ID peraturan dari database
-        extract_images: Apakah extract images/tables
-        convert_to_images: Apakah convert PDF pages to images
+        pdf_source: PDF file path, bytes, or file-like object
+        peraturan_id: Regulation ID from database
+        extract_images: Whether to extract images/tables
+        convert_to_images: Whether to convert PDF pages to images
         image_output_dir: Directory for images (default: temp directory)
         image_scale: Scale factor for image quality (default: 2.0)
 
     Returns:
-        Dictionary berisi data yang sudah siap untuk disimpan ke database
+        Dictionary containing data ready to be saved to the database
     """
     try:
         logger.info(f"Starting complete parsing for peraturan {peraturan_id}")
 
-        # Parse PDF dengan semua opsi
+        # Parse PDF with all options
         parse_result = await parse_pdf(
             pdf_source,
             extract_images=extract_images,
@@ -737,19 +737,19 @@ async def parse_peraturan_complete(
 
         logger.info(json.dumps(parse_result, default=str))
 
-        # Extract struktur peraturan
+        # Extract regulation structure
         structure = parse_result["structure"]
 
-        # Extract konten lengkap untuk bab dan pasal
-        # pages berupa list of dict dengan key "text", extract text saja
+        # Extract complete content for bab and pasal
+        # pages is a list of dicts with key "text", extract text only
         page_texts = [page.get("text", "") for page in parse_result["pages"]]
         content_structure = extract_peraturan_content_by_structure(page_texts, structure)
 
-        # Build hasil yang database-ready
+        # Build database-ready result
         result = {
             "peraturan": {
                 "id": peraturan_id,
-                "parsed_at": None,  # Akan di-update saat save ke database
+                "parsed_at": None,  # Will be updated when saving to database
                 "metadata": {
                     "page_count": parse_result["page_count"],
                     "char_count": len(parse_result["text"]),
@@ -772,7 +772,7 @@ async def parse_peraturan_complete(
             },
         }
 
-        # Tambahkan image info jika ada
+        # Add image info if any
         if convert_to_images and parse_result.get("images"):
             result["images"] = parse_result["images"]
             result["image_dir"] = parse_result.get("image_dir")
@@ -792,16 +792,16 @@ def format_peraturan_data_for_db(
     ayat_data: List[Dict],
 ) -> Tuple[Dict, List[Dict], List[Dict], List[Dict]]:
     """
-    Format data peraturan untuk disimpan ke database
+    Format regulation data for database storage
 
     Args:
-        peraturan_data: Data peraturan dasar (dari scraper)
-        bab_data: List data bab (dari parser)
-        pasal_data: List data pasal (dari parser)
-        ayat_data: List data ayat (dari parser)
+        peraturan_data: Basic regulation data (from scraper)
+        bab_data: List of bab data (from parser)
+        pasal_data: List of pasal data (from parser)
+        ayat_data: List of ayat data (from parser)
 
     Returns:
-        Tuple (peraturan, bab_list, pasal_list, ayat_list) yang sudah diformat
+        Tuple (peraturan, bab_list, pasal_list, ayat_list) properly formatted
     """
     # Format peraturan data
     peraturan = {
@@ -825,7 +825,7 @@ def format_peraturan_data_for_db(
         "tanggal_diundangkan": peraturan_data.get("tanggal_diundangkan"),
         "deskripsi": peraturan_data.get("deskripsi"),
         "metadata": peraturan_data.get("metadata", {}),
-        "parsed_at": None,  # Akan di-update saat save ke database
+        "parsed_at": None,  # Will be updated when saving to database
     }
 
     # Format bab data
@@ -843,11 +843,11 @@ def format_peraturan_data_for_db(
     # Format pasal data
     pasal_list = []
     for pasal in pasal_data:
-        # Find bab_id berdasarkan nomor_bab
+        # Find bab_id based on nomor_bab
         bab_id = None
         for bab in bab_list:
             if bab["nomor_bab"] == pasal.get("bab_id"):
-                # Bab_id akan di-generate setelah insert ke database
+                # Bab_id will be generated after database insert
                 break
 
         pasal_list.append(
@@ -857,7 +857,7 @@ def format_peraturan_data_for_db(
                 "judul_pasal": pasal.get("judul_pasal"),
                 "konten_pasal": pasal.get("konten_pasal"),
                 "urutan": pasal.get("urutan"),
-                "bab_id": bab_id,  # Akan di-update setelah insert bab
+                "bab_id": bab_id,  # Will be updated after bab insert
                 "metadata": {},
             }
         )
@@ -865,16 +865,16 @@ def format_peraturan_data_for_db(
     # Format ayat data
     ayat_list = []
     for ayat in ayat_data:
-        # Find pasal_id berdasarkan nomor_pasal
+        # Find pasal_id based on nomor_pasal
         pasal_id = None
         for pasal in pasal_list:
             if pasal["nomor_pasal"] == ayat.get("pasal_id"):
-                # Pasal_id akan di-generate setelah insert ke database
+                # Pasal_id will be generated after database insert
                 break
 
         ayat_list.append(
             {
-                "pasal_id": pasal_id,  # Akan di-update setelah insert pasal
+                "pasal_id": pasal_id,  # Will be updated after pasal insert
                 "nomor_ayat": ayat.get("nomor_ayat"),
                 "konten_ayat": ayat.get("konten_ayat"),
                 "urutan": ayat.get("urutan"),

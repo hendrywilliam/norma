@@ -1,6 +1,6 @@
 """
-Status Management untuk Parsing Jobs
-Track status parsing yang sedang berjalan atau sudah selesai
+Status Management for Parsing Jobs
+Track parsing status of running or completed jobs
 """
 
 from typing import Dict, Optional
@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Global status storage (in-memory, bisa diganti dengan Redis/Database nanti)
+# Global status storage (in-memory, can be replaced with Redis/Database later)
 _parse_status: Dict = {
     "is_running": False,
     "job_id": None,
@@ -25,16 +25,16 @@ _parse_status: Dict = {
     "processed_items": 0,
 }
 
-# Thread lock untuk concurrent access
+# Thread lock for concurrent access
 _status_lock = Lock()
 
 
 def get_parse_status() -> Dict:
     """
-    Get status parsing terakhir
+    Get the latest parsing status
 
     Returns:
-        Dictionary berisi status parsing
+        Dictionary containing parsing status
     """
     with _status_lock:
         return _parse_status.copy()
@@ -54,20 +54,20 @@ def update_parse_status(
     processed_items: Optional[int] = None,
 ) -> None:
     """
-    Update status parsing
+    Update parsing status
 
     Args:
-        is_running: Status apakah parsing sedang berjalan
-        job_id: ID dari job yang sedang berjalan
-        current_task: Task yang sedang dijalankan
-        last_run: Waktu terakhir parsing dijalankan
-        last_success: Waktu terakhir parsing berhasil
-        total_parsed: Total peraturan yang berhasil diparse
-        total_failed: Total peraturan yang gagal diparse
-        error: Error message jika parsing gagal
+        is_running: Whether parsing is currently running
+        job_id: ID of the running job
+        current_task: Currently running task
+        last_run: Last time parsing was run
+        last_success: Last time parsing succeeded
+        total_parsed: Total regulations successfully parsed
+        total_failed: Total regulations that failed to parse
+        error: Error message if parsing failed
         progress: Progress percentage (0-100)
-        total_items: Total items yang akan diparse
-        processed_items: Total items yang sudah diparse
+        total_items: Total items to parse
+        processed_items: Total items already parsed
     """
     with _status_lock:
         if is_running is not None:
@@ -108,11 +108,11 @@ def update_parse_status(
 
 def start_parsing(job_id: str, total_items: int = 0) -> None:
     """
-    Mulai tracking untuk parsing job baru
+    Start tracking a new parsing job
 
     Args:
-        job_id: ID dari parsing job
-        total_items: Total items yang akan diparse
+        job_id: ID of the parsing job
+        total_items: Total items to parse
     """
     update_parse_status(
         is_running=True,
@@ -132,12 +132,12 @@ def finish_parsing(
     job_id: Optional[str] = None, success: bool = True, error: Optional[str] = None
 ) -> None:
     """
-    Selesaikan parsing job
+    Finish a parsing job
 
     Args:
-        job_id: ID dari parsing job
-        success: Apakah parsing berhasil
-        error: Error message jika gagal
+        job_id: ID of the parsing job
+        success: Whether parsing succeeded
+        error: Error message if failed
     """
     if success:
         update_parse_status(
@@ -158,13 +158,13 @@ def update_progress(
     job_id: Optional[str] = None, current: int = 0, total: int = 0, task: Optional[str] = None
 ) -> None:
     """
-    Update progress parsing
+    Update parsing progress
 
     Args:
-        job_id: ID dari parsing job
-        current: Jumlah item yang sudah diparse
-        total: Total item yang akan diparse
-        task: Task yang sedang dijalankan
+        job_id: ID of the parsing job
+        current: Number of items already parsed
+        total: Total items to parse
+        task: Currently running task
     """
     progress = int((current / total) * 100) if total > 0 else 0
 
@@ -180,7 +180,7 @@ def update_progress(
 
 
 def increment_success_count() -> None:
-    """Increment counter peraturan yang berhasil diparse"""
+    """Increment counter for successfully parsed regulations"""
     with _status_lock:
         _parse_status["total_parsed"] += 1
 
@@ -189,7 +189,7 @@ def increment_success_count() -> None:
 
 def increment_failure_count(error: Optional[str] = None) -> None:
     """
-    Increment counter peraturan yang gagal diparse
+    Increment counter for regulations that failed to parse
 
     Args:
         error: Error message
@@ -203,7 +203,7 @@ def increment_failure_count(error: Optional[str] = None) -> None:
 
 
 def reset_status() -> None:
-    """Reset status parsing ke nilai awal"""
+    """Reset parsing status to initial values"""
     with _status_lock:
         _parse_status.update(
             {
@@ -226,10 +226,10 @@ def reset_status() -> None:
 
 def is_parsing_running() -> bool:
     """
-    Cek apakah parsing sedang berjalan
+    Check if parsing is currently running
 
     Returns:
-        True jika parsing sedang berjalan
+        True if parsing is running
     """
     with _status_lock:
         return _parse_status["is_running"]
@@ -237,10 +237,10 @@ def is_parsing_running() -> bool:
 
 def get_job_id() -> Optional[str]:
     """
-    Get ID dari job yang sedang berjalan
+    Get ID of the currently running job
 
     Returns:
-        Job ID atau None jika tidak ada job yang berjalan
+        Job ID or None if no job is running
     """
     with _status_lock:
         return _parse_status["job_id"]
@@ -248,10 +248,10 @@ def get_job_id() -> Optional[str]:
 
 def get_progress() -> Dict[str, int]:
     """
-    Get progress parsing
+    Get parsing progress
 
     Returns:
-        Dictionary dengan progress, processed_items, dan total_items
+        Dictionary with progress, processed_items, and total_items
     """
     with _status_lock:
         return {

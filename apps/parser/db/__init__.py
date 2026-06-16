@@ -2,7 +2,7 @@
 Database module
 """
 
-from .db import (
+from .connection import (
     init_db_pool,
     close_db_pool,
     get_db_connection,

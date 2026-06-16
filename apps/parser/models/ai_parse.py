@@ -126,40 +126,40 @@ class AIBatchParseResult(BaseModel):
 
 
 class AyatParsedNode(BaseModel):
-    """Model untuk ayat yang di-parse oleh AI"""
+    """Model for ayat parsed by AI"""
 
-    nomor_ayat: str = Field(..., description="Nomor ayat ((1), (2), dst)")
-    konten_ayat: str = Field(..., description="Konten ayat")
-    urutan: int = Field(..., description="Urutan ayat dalam pasal")
+    nomor_ayat: str = Field(..., description="Ayat number ((1), (2), etc.)")
+    konten_ayat: str = Field(..., description="Ayat content")
+    urutan: int = Field(..., description="Ayat order within pasal")
 
 
 class PasalParsedNode(BaseModel):
-    """Model untuk pasal yang di-parse oleh AI"""
+    """Model for pasal parsed by AI"""
 
-    nomor_pasal: str = Field(..., description="Nomor pasal")
-    judul_pasal: Optional[str] = Field(None, description="Judul pasal")
-    konten_pasal: str = Field(..., description="Konten pasal")
-    urutan: int = Field(..., description="Urutan pasal dalam peraturan")
+    nomor_pasal: str = Field(..., description="Pasal number")
+    judul_pasal: Optional[str] = Field(None, description="Pasal title")
+    konten_pasal: str = Field(..., description="Pasal content")
+    urutan: int = Field(..., description="Pasal order within peraturan")
     ayat_list: List[AyatParsedNode] = Field(
-        default_factory=list, description="List ayat dalam pasal"
+        default_factory=list, description="List of ayat in pasal"
     )
 
 
 class BabParsedNode(BaseModel):
-    """Model untuk bab yang di-parse oleh AI"""
+    """Model for bab parsed by AI"""
 
-    nomor_bab: str = Field(..., description="Nomor bab (I, II, III, dst)")
-    judul_bab: Optional[str] = Field(None, description="Judul bab")
-    urutan: int = Field(..., description="Urutan bab dalam peraturan")
+    nomor_bab: str = Field(..., description="Bab number (I, II, III, etc.)")
+    judul_bab: Optional[str] = Field(None, description="Bab title")
+    urutan: int = Field(..., description="Bab order within peraturan")
     pasal_list: List[PasalParsedNode] = Field(
-        default_factory=list, description="List pasal dalam bab"
+        default_factory=list, description="List of pasal in bab"
     )
 
 
 class AIParseTreeResult(BaseModel):
-    """Result model for AI parsing dengan struktur tree (nested)
+    """Result model for AI parsing with tree structure (nested)
 
-    Struktur tree:
+    Tree structure:
     - Peraturan
       ├── bab_list: List[BabParsedNode]
       │   └── BabParsedNode
@@ -174,10 +174,10 @@ class AIParseTreeResult(BaseModel):
     success: bool = Field(..., description="Whether parsing was successful")
     peraturan_id: str = Field(..., description="ID of the peraturan")
     bab_list: List[BabParsedNode] = Field(
-        default_factory=list, description="List bab dengan pasal nested"
+        default_factory=list, description="List of bab with nested pasal"
     )
     pasal_tanpa_bab_list: List[PasalParsedNode] = Field(
-        default_factory=list, description="List pasal tanpa bab (standalone)"
+        default_factory=list, description="List of pasal without bab (standalone)"
     )
     full_text: str = Field("", description="Full text extracted from all pages")
     page_count: int = Field(0, description="Total number of pages processed")

@@ -6,7 +6,8 @@ metadata:
   labels:
     app: restapi
 spec:
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerClass: tailscale
   ports:
   - port: 8080
     targetPort: 8080

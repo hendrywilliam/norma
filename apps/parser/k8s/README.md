@@ -12,8 +12,8 @@ kubernetes/
 ├── pvc.yaml                  # Persistent Volume Claim untuk PostgreSQL
 ├── postgres-statefulset.yaml   # PostgreSQL StatefulSet
 ├── postgres-service.yaml       # PostgreSQL Service
-├── parser-deployment.yaml      # Parser API Deployment
-├── parser-service.yaml        # Parser API Service
+├── deployment.yaml      # Parser API Deployment
+├── service.yaml        # Parser API Service
 ├── ingress.yaml              # Ingress untuk external access
 └── hpa.yaml                 # Horizontal Pod Autoscaler
 ```
@@ -65,8 +65,8 @@ kubectl apply -f kubernetes/configmap.yaml -n norma-parser
 kubectl apply -f kubernetes/pvc.yaml -n norma-parser
 kubectl apply -f kubernetes/postgres-statefulset.yaml -n norma-parser
 kubectl apply -f kubernetes/postgres-service.yaml -n norma-parser
-kubectl apply -f kubernetes/parser-deployment.yaml -n norma-parser
-kubectl apply -f kubernetes/parser-service.yaml -n norma-parser
+kubectl apply -f kubernetes/deployment.yaml -n norma-parser
+kubectl apply -f kubernetes/service.yaml -n norma-parser
 kubectl apply -f kubernetes/ingress.yaml -n norma-parser
 kubectl apply -f kubernetes/hpa.yaml -n norma-parser
 ```
@@ -135,7 +135,7 @@ curl http://parser.norma.local/api/status
 
 ### LoadBalancer Service (alternatif)
 
-Jika cluster mendukung LoadBalancer, ubah `type: ClusterIP` ke `type: LoadBalancer` di `parser-service.yaml`:
+Jika cluster mendukung LoadBalancer, ubah `type: ClusterIP` ke `type: LoadBalancer` di `service.yaml`:
 
 ```yaml
 spec:
