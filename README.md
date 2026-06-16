@@ -7,7 +7,7 @@ Three services:
 - **REST API** (Go/Gin) — Clean Architecture CRUD for legal documents
 - **Web** (Next.js 16/shadcn) — Browsing and search with Civic Ledger theme
 
-Stack: PostgreSQL 16, Docker/K8s (Calico CNI), Go, Python.
+Stack: PostgreSQL 16, Docker/K8s (Calico CNI, external-secrets), Go, Python.
 
 ## Network Segmentation
 
