@@ -209,12 +209,12 @@ Environment variables dikonfigurasi di deployment file. Untuk secret seperti `DB
 
 1. Namespace `norma` sudah dibuat:
    ```bash
-   kubectl apply -f apps/infra/namespace.yaml
+   kubectl apply -f infra/namespace.yaml
    ```
 
 2. Secret `norma-secrets` sudah dibuat:
    ```bash
-   kubectl apply -f apps/infra/secret.yaml
+   kubectl apply -f infra/secret.yaml
    ```
 
 3. PostgreSQL service running (atau gunakan external database)

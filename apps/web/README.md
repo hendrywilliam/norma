@@ -108,7 +108,7 @@ echo "127.0.0.1 web.norma.local" | sudo tee -a /etc/hosts
 
 1. Namespace `norma` sudah dibuat:
    ```bash
-   kubectl apply -f apps/infra/namespace.yaml
+   kubectl apply -f infra/namespace.yaml
    ```
 
 2. NGINX Ingress Controller terinstall di cluster:
